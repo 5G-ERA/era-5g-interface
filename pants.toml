@@ -38,3 +38,7 @@ extra_requirements.add = [
   "vulture"
 ]
 lockfile = "flake8.lock"
+
+[mypy]
+version="mypy==1.0.1"
+lockfile = "mypy.lock"

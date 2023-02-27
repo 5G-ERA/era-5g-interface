@@ -51,7 +51,8 @@ class TaskHandlerGstreamer(TaskHandler, ABC):
                 raise TaskHandlerInitializationFailed("VideoCapture was not opened")
             logging.info("Gstreamer capture created")
         except Exception as e:
-            logging.info(f"Gstreamer capture failed. {str(e)}")
+            logging.error(f"Gstreamer capture failed. {str(e)}")
+            # TODO: raise exception?
             exit(1)
 
         while not self.stop_event.is_set():
@@ -60,3 +61,4 @@ class TaskHandlerGstreamer(TaskHandler, ABC):
                 # extract the timestamp from the frame
                 timestamp = cap.get(cv2.CAP_PROP_POS_MSEC)
                 self.store_image({"sid": self.sid, "websocket_id": self.websocket_id, "timestamp": timestamp}, frame)
+        cap.release()

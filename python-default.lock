@@ -9,7 +9,7 @@
 //     "CPython<3.11,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "opencv-python~=4.6.0.66"
+//     "opencv-python~=4.6.0.37"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -160,7 +160,7 @@
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "opencv-python~=4.6.0.66"
+    "opencv-python~=4.6.0.37"
   ],
   "requires_python": [
     "<3.11,>=3.8"

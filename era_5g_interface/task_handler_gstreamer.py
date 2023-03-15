@@ -58,7 +58,7 @@ class TaskHandlerGstreamer(TaskHandler, ABC):
         while not self.stop_event.is_set():
             ret, frame = cap.read()
             if ret:
-                # extract the timestamp from the frame
-                timestamp = cap.get(cv2.CAP_PROP_POS_MSEC)
+                # use frame number instead of unknown timestamp
+                timestamp = str(int(cap.get(cv2.CAP_PROP_POS_FRAMES)))
                 self.store_image({"sid": self.sid, "websocket_id": self.websocket_id, "timestamp": timestamp}, frame)
         cap.release()

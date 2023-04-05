@@ -1,5 +1,7 @@
 from queue import Full, Queue
 
+import numpy as np
+
 from era_5g_interface.task_handler import TaskHandler
 
 
@@ -26,7 +28,7 @@ class TaskHandlerInternalQ(TaskHandler):
         self._q = image_queue
         self.index = 0
 
-    def store_image(self, metadata: dict, image) -> None:
+    def store_image(self, metadata: dict, image: np.ndarray) -> None:
         """Method which will store the image to the queue for processing.
 
         Args:

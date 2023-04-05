@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from threading import Event, Thread
 from typing import Optional
 
+import numpy as np
+
 
 class TaskHandlerInitializationFailed(Exception):
     pass
@@ -31,7 +33,7 @@ class TaskHandler(Thread, ABC):
         pass
 
     @abstractmethod
-    def store_image(self, metadata: dict, image: bytes) -> None:
+    def store_image(self, metadata: dict, image: np.ndarray) -> None:
         """This method is intended to pass the image to the worker (using
         internal queues, message broker or anything else).
 

@@ -1,4 +1,5 @@
 import logging
+import time
 from abc import ABC
 
 import cv2
@@ -37,16 +38,17 @@ class TaskHandlerGstreamer(TaskHandler, ABC):
         """
 
         # pipeline which decodes a h264 stream
-        camSet = (
-            f'udpsrc port={self.port} caps="application/x-rtp,media=(string)video,encoding-name=(string)H264,'
-            f'payload=(int)96" ! rtpjitterbuffer ! rtph264depay ! avdec_h264 ! videorate ! videoconvert ! '
-            f"appsink"
+        pipeline = (
+            f"udpsrc port={self.port} "
+            'caps="application/x-rtp,media=(string)video,encoding-name=(string)H264,'
+            'payload=(int)96" ! '
+            "rtph264depay ! avdec_h264 ! videoconvert ! appsink"
         )
 
         try:
             logging.info(f"Creating Gstreamer capture on port {self.port}")
             # standard OpenCV VideoCapture connected to the Gstreamer pipeline
-            cap = cv2.VideoCapture(camSet)
+            cap = cv2.VideoCapture(pipeline)
             if not cap.isOpened():
                 raise TaskHandlerInitializationFailed("VideoCapture was not opened")
             logging.info("Gstreamer capture created")
@@ -58,7 +60,18 @@ class TaskHandlerGstreamer(TaskHandler, ABC):
         while not self.stop_event.is_set():
             ret, frame = cap.read()
             if ret:
+                recv_timestamp = time.time_ns()
                 # use frame number instead of unknown timestamp
+                logging.debug(f"CAP_PROP_POS_MSEC: {int(cap.get(cv2.CAP_PROP_POS_MSEC ))}")
+                logging.debug(f"CAP_PROP_POS_FRAMES: {int(cap.get(cv2.CAP_PROP_POS_FRAMES))} {recv_timestamp}")
                 timestamp = str(int(cap.get(cv2.CAP_PROP_POS_FRAMES)))
-                self.store_image({"sid": self.sid, "websocket_id": self.websocket_id, "timestamp": timestamp}, frame)
+                self.store_image(
+                    {
+                        "sid": self.sid,
+                        "websocket_id": self.websocket_id,
+                        "timestamp": timestamp,
+                        "recv_timestamp": recv_timestamp,
+                    },
+                    frame,
+                )
         cap.release()

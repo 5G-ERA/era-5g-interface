@@ -44,3 +44,20 @@ class TaskHandler(Thread, ABC):
         """
 
         pass
+
+    @abstractmethod
+    def store_control_data(self, data: dict) -> None:
+        """This method is intended to pass control commands to the worker.
+
+        Args:
+            data (dict): Dictionary with control data.
+                The format is NetApp-specific.
+        """
+
+        pass
+
+    @abstractmethod
+    def clear_storage(self) -> None:
+        """Clear storage used for communication with worker."""
+
+        pass

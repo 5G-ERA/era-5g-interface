@@ -4,6 +4,8 @@ from typing import Optional
 
 import numpy as np
 
+from era_5g_interface.dataclasses.control_command import ControlCommand
+
 
 class TaskHandlerInitializationFailed(Exception):
     pass
@@ -46,12 +48,11 @@ class TaskHandler(Thread, ABC):
         pass
 
     @abstractmethod
-    def store_control_data(self, data: dict) -> None:
+    def store_control_data(self, data: ControlCommand) -> None:
         """This method is intended to pass control commands to the worker.
 
         Args:
-            data (dict): Dictionary with control data.
-                The format is NetApp-specific.
+            data (ControlCommand): ControlCommand with control data.
         """
 
         pass

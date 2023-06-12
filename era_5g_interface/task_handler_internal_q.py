@@ -2,6 +2,7 @@ from queue import Empty, Full, Queue
 
 import numpy as np
 
+from era_5g_interface.dataclasses.control_command import ControlCommand
 from era_5g_interface.task_handler import TaskHandler
 
 
@@ -43,12 +44,11 @@ class TaskHandlerInternalQ(TaskHandler):
             pass
             # TODO: raise an exception
 
-    def store_control_data(self, data: dict) -> None:
+    def store_control_data(self, data: ControlCommand) -> None:
         """Pass control commands to the worker using internal queue.
 
         Args:
-            data (dict): Dictionary with control data.
-                The format is NetApp-specific.
+            data (ControlCommand): ControlCommand with control data.
         """
 
         try:

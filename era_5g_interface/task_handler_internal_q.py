@@ -1,7 +1,8 @@
-from queue import Full, Queue
+from queue import Empty, Full, Queue
 
 import numpy as np
 
+from era_5g_interface.dataclasses.control_command import ControlCommand
 from era_5g_interface.task_handler import TaskHandler
 
 
@@ -42,6 +43,29 @@ class TaskHandlerInternalQ(TaskHandler):
         except Full:
             pass
             # TODO: raise an exception
+
+    def store_control_data(self, data: ControlCommand) -> None:
+        """Pass control commands to the worker using internal queue.
+
+        Args:
+            data (ControlCommand): ControlCommand with control data.
+        """
+
+        try:
+            self._q.put((data), block=False)
+        except Full:
+            pass
+            # TODO: raise an exception
+
+    def clear_storage(self) -> None:
+        """Clear all items from internal queue."""
+
+        while not self._q.empty():
+            try:
+                self._q.get(block=False)
+            except Empty:
+                break
+            self._q.task_done()
 
     def run(self) -> None:
         pass

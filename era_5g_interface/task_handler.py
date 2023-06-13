@@ -4,6 +4,8 @@ from typing import Optional
 
 import numpy as np
 
+from era_5g_interface.dataclasses.control_command import ControlCommand
+
 
 class TaskHandlerInitializationFailed(Exception):
     pass
@@ -42,5 +44,21 @@ class TaskHandler(Thread, ABC):
                 The format is NetApp-specific.
             image (_type_): The image to be processed.
         """
+
+        pass
+
+    @abstractmethod
+    def store_control_data(self, data: ControlCommand) -> None:
+        """This method is intended to pass control commands to the worker.
+
+        Args:
+            data (ControlCommand): ControlCommand with control data.
+        """
+
+        pass
+
+    @abstractmethod
+    def clear_storage(self) -> None:
+        """Clear storage used for communication with worker."""
 
         pass

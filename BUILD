@@ -4,3 +4,15 @@ python_requirements(
         "opencv-python": ["cv2"],
     },
 )
+
+python_requirements(
+    name="flake8",
+    source="flake8.txt",
+    resolve="flake8",
+)
+
+python_requirements(
+    name="mypy",
+    source="mypy.txt",
+    resolve="mypy",
+)

@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.14.1"
+pants_version = "2.16.0"
 backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
@@ -12,7 +12,7 @@ backend_packages.add = [
 
 [anonymous-telemetry]
 enabled = true
-repo_id = "a888d69447a54a8892c9fe2cd1ea2ace"
+repo_id = "a888d69447a54a8892c9fe2cd1ea2aceeredfdfg"
 
 [source]
 # The Python source root is the repo root. See https://www.pantsbuild.org/docs/source-roots.
@@ -20,7 +20,7 @@ root_patterns = ["/"]
 
 [python]
 interpreter_constraints = [">=3.8,<3.11"]
-resolves = { python-default = "python-default.lock"}
+resolves = { python-default = "python-default.lock", flake8 = "flake8.lock", mypy = "mypy.lock"}
 
 enable_resolves = true
 
@@ -28,17 +28,7 @@ enable_resolves = true
 search_path = ["<PATH>", "<PYENV>"]
 
 [flake8]
-extra_requirements.add = [
-  "flake8-tidy-imports",
-  "flake8-annotations-coverage",
-  "flake8-pytest-style",
-  "flake8-bugbear",
-  "flake8-pantsbuild",
-  "flake8-absolute-import",
-  "vulture"
-]
-lockfile = "flake8.lock"
+install_from_resolve = "flake8"
 
 [mypy]
-version="mypy==1.0.1"
-lockfile = "mypy.lock"
+install_from_resolve = "mypy"

@@ -1,5 +1,6 @@
 python_requirements(
     name="reqs",
+    source="requirements.txt",
     module_mapping={
         "opencv-python": ["cv2"],
     },

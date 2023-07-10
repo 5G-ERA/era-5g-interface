@@ -1,9 +1,12 @@
+import logging
 from queue import Empty, Full, Queue
 
 import numpy as np
 
 from era_5g_interface.dataclasses.control_command import ControlCommand
 from era_5g_interface.task_handler import TaskHandler
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class TaskHandlerInternalQ(TaskHandler):
@@ -26,8 +29,13 @@ class TaskHandlerInternalQ(TaskHandler):
         """
 
         super().__init__(sid=sid, **kw)
-        self._q = image_queue
-        self.index = 0
+        self._q: Queue = image_queue
+
+    def image_queue_size(self) -> int:
+        return self._q.qsize()
+
+    def image_queue_occupancy(self) -> float:
+        return self._q.qsize() / self._q.maxsize
 
     def store_image(self, metadata: dict, image: np.ndarray) -> None:
         """Method which will store the image to the queue for processing.
@@ -37,7 +45,8 @@ class TaskHandlerInternalQ(TaskHandler):
                 The format is NetApp-specific.
             image (_type_): The image to be processed.
         """
-
+        self.frame_id += 1
+        # logger.info(f"TaskHandlerInternalQ received frame id: {self.frame_id} with timestamp: {metadata['timestamp']}")
         try:
             self._q.put((metadata, image), block=False)
         except Full:
@@ -52,7 +61,7 @@ class TaskHandlerInternalQ(TaskHandler):
         """
 
         try:
-            self._q.put((data), block=False)
+            self._q.put(data, block=False)
         except Full:
             pass
             # TODO: raise an exception
@@ -66,6 +75,3 @@ class TaskHandlerInternalQ(TaskHandler):
             except Empty:
                 break
             self._q.task_done()
-
-    def run(self) -> None:
-        pass

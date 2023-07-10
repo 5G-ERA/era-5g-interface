@@ -2,6 +2,8 @@ import logging
 import time
 from typing import Callable, Optional
 
+logger = logging.getLogger("Rate timer")
+
 
 class RateTimer:
     """Iteration timer used to control the speed of a loop.
@@ -74,7 +76,7 @@ class RateTimer:
         self.next_iteration_time = self.creation_time + self.total_iteration_time
 
         if self.verbose:
-            logging.info(f"RateTimer ({self.name}) created.")
+            logger.info(f"RateTimer ({self.name}) created.")
 
     def sleep(self) -> None:
         self.times_called += 1
@@ -94,10 +96,10 @@ class RateTimer:
 
             miss_msg = f"RateTimer ({self.name}): Iteration missed."
             if self.iteration_miss_warning:
-                logging.warning(miss_msg)
+                logger.warning(miss_msg)
             else:
                 if self.verbose:
-                    logging.info(miss_msg)
+                    logger.info(miss_msg)
 
             # Do not perform any sleep
             return
@@ -126,17 +128,17 @@ def rate_timer_example() -> None:
 
     import random
 
-    logging.getLogger().setLevel(logging.INFO)
+    logger.setLevel(logging.INFO)
 
     rate = 2  # FPS
     iteration_time = 1.0 / rate
-    logging.info(f"Using rate timer with rate {rate} Hz ({iteration_time} s).")
+    logger.info(f"Using rate timer with rate {rate} Hz ({iteration_time} s).")
 
     # RateTimer should be created right before the loop starts
     rate_timer = RateTimer(rate, verbose=True, iteration_miss_warning=True)
 
     while True:
-        logging.info(f"Time is: {time.time()}")
+        logger.info(f"Time is: {time.time()}")
 
         # Generate random sleep time which is sometimes too long and forces iteration miss
         rand_time = random.uniform(iteration_time * 0.5, iteration_time * 1.1)

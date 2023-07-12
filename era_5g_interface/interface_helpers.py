@@ -52,7 +52,7 @@ class HeartBeatSender:
                 response = self.session.post(MIDDLEWARE_ADDRESS, headers=headers, json=json, timeout=(0.2, 0.2))
                 logger.info(f"Middleware heart_beat response: {response.text}")
             except requests.RequestException as e:
-                logger.warning(f"Failed to connect to the middleware address: {MIDDLEWARE_ADDRESS}, {e}")
+                logger.warning(f"Failed to connect to the middleware address: {MIDDLEWARE_ADDRESS}, {repr(e)}")
                 self.connection_error = True
 
     def send_middleware_heart_beat(

@@ -22,6 +22,7 @@ class TaskHandler(ABC):
         self.websocket_id: Optional[str] = None
         self.frame_id = 0
         self.decoder = decoder
+        self.last_timestamp = 0
 
     @abstractmethod
     def store_image(self, metadata: dict, image: np.ndarray) -> None:

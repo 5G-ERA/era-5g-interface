@@ -5,23 +5,30 @@ from enum import IntEnum
 class ControlCmdType(IntEnum):
     """Possible types of control commands for Network Application."""
 
-    RESET_STATE = 1
+    INIT = 1
+    """Control Command used for initialization.
+
+    Data required for initialization is provided using the data dict
+    in the ControlCommand class.
+    """
+
+    RESET_STATE = 2
     """Reset current state of the Network Application."""
 
-    GET_STATE = 2
+    GET_STATE = 3
     """Read and obtain current state of the Network Application."""
 
-    SET_STATE = 3
+    SET_STATE = 4
     """Set newly defined state of the Network Application.
 
     The information about the new state can be provided using the
     data dict in the ControlCommand class.
     """
 
-    SAVE_STATE = 4
+    SAVE_STATE = 5
     """Save current state on cloud storage."""
 
-    LOAD_STATE = 5
+    LOAD_STATE = 6
     """Load saved state from cloud storage."""
 
 

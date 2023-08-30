@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
-
-import numpy as np
+from typing import Any, Optional
 
 from era_5g_interface.dataclasses.control_command import ControlCommand
 
@@ -25,7 +23,7 @@ class TaskHandler(ABC):
         self.last_timestamp = 0
 
     @abstractmethod
-    def store_image(self, metadata: dict, image: np.ndarray) -> None:
+    def store_data(self, metadata: dict, data: Any) -> None:
         """This method is intended to pass the image to the worker (using
         internal queues, message broker or anything else).
 

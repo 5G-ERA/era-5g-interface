@@ -16,9 +16,9 @@ pip install era_5g_interface
 
 ## Classes
 
-### ThreadBase (common.py)
+### H264Decoder and H264Encoder (h264_decoder.py and h264_encoder.py)
 
-Base Thread class which provides common methods.
+H.264 encoder and decoder classes.
 
 ### TaskHandler (task_handler.py)
 

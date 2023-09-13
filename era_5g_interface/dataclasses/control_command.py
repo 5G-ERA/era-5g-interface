@@ -39,7 +39,7 @@ class ControlCommand:
 
     Args:
         cmd_type (ControlCmdType): Type of the command to be sent.
-        clear_queue (bool, optional): Clear previous uprocessed data (if any)
+        clear_queue (bool, optional): Clear previous unprocessed data (if any)
             in the internal queue. Default is False.
         data (dict, optional): Data to be passed along with the command,
             e.g. new state data in case of command with type

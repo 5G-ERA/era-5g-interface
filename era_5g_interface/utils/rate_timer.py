@@ -8,9 +8,8 @@ logger = logging.getLogger("Rate timer")
 class RateTimer:
     """Iteration timer used to control the speed of a loop.
 
-    The timer takes into account the time consumed by processed work
-    and sleeps only for the time remaining to complete the iteration.
-    Code is loosely inpired by ROS Rate object and by
+    The timer takes into account the time consumed by processed work and sleeps only for the time remaining to
+    complete the iteration. Code is loosely inspired by ROS Rate object and by
     https://stackoverflow.com/questions/23252796/control-the-speed-of-a-loop/23253617
     """
 
@@ -27,33 +26,27 @@ class RateTimer:
         """Initialize RateTimer.
 
         Args:
-            rate (float, optional): Required number of iterations per
-            second (i.e. rate in Hz, or FPS).
-                Note: Either rate or iteration_time has to be provided.
-            iteration_time (float, optional): Required length of one
-                interation in seconds.
-                Note: Either rate or iteration_time has to be provided.
-            name (str, optional): User-defined name of the RateTimer
-                object. Default is 'timer'.
-            time_function (callable): Function that is called in order
-                to determine current time. Default is time.time.
-            iteration_miss_warning (bool): Logging flag. If True, each
-                iteration misss is logged as a warning. Default is
-                False.
-            interval_reinit_after_miss (bool): Default is True.
-                Flag to determine if a new interation interval should
-                start after iteration miss (when set to True) or if the
-                next iteration should be attempted as if there was no
-                miss (when set to False).
+            rate (float, optional): Required number of iterations per second (i.e. rate in Hz, or FPS). Note: Either
+                rate or iteration_time has to be provided.
+            iteration_time (float, optional): Required length of one interation in seconds. Note: Either rate or
+                iteration_time has to be provided.
+            name (str): User-defined name of the RateTimer object. Default is 'timer'.
+            time_function (Callable[[], float]): Function that is called in order to determine current time. Default is
+                time.time.
+            iteration_miss_warning (bool): Logging flag. If True, each iteration miss is logged as a warning.
+                Default is False.
+            interval_reinit_after_miss (bool): Default is True. Flag to determine if a new interation interval should
+                start after iteration miss (when set to True) or if the next iteration should be attempted as if there
+                was no miss (when set to False).
             verbose (bool): Logging verbosity flag. Default is False.
         """
 
         if rate is None and iteration_time is None:
-            raise RuntimeError("Either 'rate' or 'iteration_time' has to be specfied for RateTimer.")
+            raise RuntimeError("Either 'rate' or 'iteration_time' has to be specified for RateTimer.")
         if rate is not None and iteration_time is not None:
             raise RuntimeError("Only 'rate' or 'interation_time' can be provided for RateTimer, but not both.")
 
-        # Either rate in Hz (FPS) or iteration time (in seconds) can be given
+        # Either rate in Hz (FPS) or iteration time (in seconds) can be given.
         if iteration_time is not None:
             self.total_iteration_time = iteration_time
             self.rate = 1.0 / iteration_time
@@ -79,6 +72,8 @@ class RateTimer:
             logger.info(f"RateTimer ({self.name}) created.")
 
     def sleep(self) -> None:
+        """Sleeps only for the time remaining to complete the iteration."""
+
         self.times_called += 1
 
         current_time = self.time_function()
@@ -87,11 +82,11 @@ class RateTimer:
             self.missed_iterations += 1
 
             if self.interval_reinit_after_miss:
-                # Plan new iterations starting from this time point (default behaviour)
+                # Plan new iterations starting from this time point (default behaviour).
                 self.next_iteration_time = current_time + self.total_iteration_time
             else:
-                # Another possibility is to try to keep the old interval between the iterations as before miss
-                # (this may be problematic in case of larger time miss, because more iterations may then happen without sleep)
+                # Another possibility is to try to keep the old interval between the iterations as before miss.
+                # This may be problematic in case of larger time miss, because more iterations may happen without sleep.
                 self.next_iteration_time += self.total_iteration_time
 
             miss_msg = f"RateTimer ({self.name}): Iteration missed."
@@ -101,18 +96,24 @@ class RateTimer:
                 if self.verbose:
                     logger.info(miss_msg)
 
-            # Do not perform any sleep
+            # Do not perform any sleep.
             return
 
-        # time remaining to next iteration
+        # Time remaining to next iteration.
         sleep_time = self.next_iteration_time - self.time_function()
         if sleep_time < 0:
-            # sleep time must not be negative (it can happen due to threading)
+            # Sleep time must not be negative (it can happen due to threading).
             sleep_time = 0
         self.next_iteration_time += self.total_iteration_time
         time.sleep(sleep_time)
 
     def get_statistics(self):
+        """Get statistics.
+
+        Returns:
+            Statistics dictionary
+        """
+
         data = {
             "name": self.name,
             "rate": self.rate,
@@ -130,21 +131,21 @@ def rate_timer_example() -> None:
 
     logger.setLevel(logging.INFO)
 
-    rate = 2  # FPS
+    rate = 2  # FPS.
     iteration_time = 1.0 / rate
     logger.info(f"Using rate timer with rate {rate} Hz ({iteration_time} s).")
 
-    # RateTimer should be created right before the loop starts
+    # RateTimer should be created right before the loop starts.
     rate_timer = RateTimer(rate, verbose=True, iteration_miss_warning=True)
 
     while True:
         logger.info(f"Time is: {time.time()}")
 
-        # Generate random sleep time which is sometimes too long and forces iteration miss
+        # Generate random sleep time which is sometimes too long and forces iteration miss.
         rand_time = random.uniform(iteration_time * 0.5, iteration_time * 1.1)
         time.sleep(rand_time)  # simulate work
 
-        # Sleep until next interation
+        # Sleep until next interation.
         rate_timer.sleep()
 
 

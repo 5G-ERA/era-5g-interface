@@ -1,10 +1,15 @@
 # era-5g-interface
-Python interface (support classes) for Net Applications.
+
+Python interface (support classes) for 5G-ERA Network Applications.
 
 ## Related Repositories
 
-- [era-5g-client](https://github.com/5G-ERA/era-5g-client) - client classes for 5G-ERA NetApps with various transport options.
-- [Reference-NetApp](https://github.com/5G-ERA/Reference-NetApp) - reference NetApp implementation with MMCV detector.
+- [era-5g-client](https://github.com/5G-ERA/era-5g-client) - client classes for 5G-ERA Network Applications with 
+  various transport options.
+- [era-5g-server](https://github.com/5G-ERA/era-5g-server) - server classes for 5G-ERA Network Applications with 
+  various transport options.
+- [Reference-NetApp](https://github.com/5G-ERA/Reference-NetApp) - reference 5G-ERA Network Application implementation 
+  with MMCV detector.
 
 ## Installation
 
@@ -16,17 +21,25 @@ pip install era_5g_interface
 
 ## Classes
 
-### H264Decoder and H264Encoder (h264_decoder.py and h264_encoder.py)
+### Channels ([channels.py](era_5g_interface/channels.py))
 
-H.264 encoder and decoder classes.
+Channels class is used to define bidirectional channel data callbacks and contains send functions. It handles image 
+frames JPEG and H.264 encoding/decoding. The class cannot be used alone. The ServerChannels and ClientChannels 
+classes create callbacks and encoders/decoders.
 
-### TaskHandler (task_handler.py)
+### ClientChannels and ServerChannels ([client_channels.py](era_5g_interface/client_channels.py), [server_channels.py](era_5g_interface/server_channels.py))
 
-Abstract class. Thread-based task handler which takes care of receiving data from the NetApp client and passing them to the NetApp worker.
+ClientChannels and ServerChannels classes are used to define bidirectional channel (image ans json) callbacks and contains 
+send functions. They are used inside the NetAppClientBase in era_5g_client and NetworkApplicationServer in 
+era_5g_server. ServerChannels is used with Socketio Server object, ClientChannels is used with Socketio Client object.
 
-### TaskHandlerInternalQ (task_handler_internal_q.py)
+### H264Decoder and H264Encoder ([h264_decoder.py](era_5g_interface/h264_decoder.py), [h264_encoder.py](era_5g_interface/h264_encoder.py))
 
-Task handler which takes care of passing the data to the python internal queue for future processing. It could either be inherited to implement the _run method and read the data from any source or used directly and call the store_image method externaly.
+H264Decoder and H264Encoder classes providing H.264 encoding and decoding.
+
+### TaskHandlerInternalQ ([task_handler_internal_q.py](era_5g_interface/task_handler_internal_q.py))
+
+Task handler which takes care of passing the data to the python internal queue for future processing. 
 
 ## Contributing, development
 
@@ -41,5 +54,5 @@ Task handler which takes care of passing the data to the python internal queue f
   You may then activate the environment and add `era_5g_interface` to your `PYTHONPATH`, which is equivalent 
   to installing a package using `pip install -e`.
 - To generate distribution packages (`tar.gz` and `whl`), you may run `./pants package ::`.
-- For commit messages, please stick to 
+- For commit messages, please stick to
   [https://www.conventionalcommits.org/en/v1.0.0/](https://www.conventionalcommits.org/en/v1.0.0/).

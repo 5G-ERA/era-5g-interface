@@ -3,8 +3,7 @@ from typing import Any, Iterator
 
 
 class LockedSet(set):
-    """A set which can be safely iterated and modified from different
-    threads."""
+    """A set which can be safely iterated and modified from different threads."""
 
     def __init__(self, *args, **kwargs):
         self._lock = Lock()

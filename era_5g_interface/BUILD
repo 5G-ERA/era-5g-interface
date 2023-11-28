@@ -9,8 +9,8 @@ python_distribution(
     sdist=True,
     provides=setup_py(
         name="era_5g_interface",
-        version="0.6.1",
-        description="An interface for 5G-ERA NetApps",
+        version="0.7.0rc0",
+        description="An interface for 5G-ERA Network Applications",
         author="Michal Kapinus",
         author_email="ikapinus@fit.vutbr.cz",
         license="LGPL",

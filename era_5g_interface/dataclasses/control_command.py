@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import IntEnum
+from typing import Dict, Optional
 
 
 class ControlCmdType(IntEnum):
@@ -8,8 +9,7 @@ class ControlCmdType(IntEnum):
     INIT = 1
     """Control Command used for initialization.
 
-    Data required for initialization is provided using the data dict
-    in the ControlCommand class.
+    Data required for initialization is provided using the data dict in the ControlCommand class.
     """
 
     RESET_STATE = 2
@@ -21,8 +21,7 @@ class ControlCmdType(IntEnum):
     SET_STATE = 4
     """Set newly defined state of the Network Application.
 
-    The information about the new state can be provided using the
-    data dict in the ControlCommand class.
+    The information about the new state can be provided using the data dict in the ControlCommand class.
     """
 
     SAVE_STATE = 5
@@ -34,18 +33,15 @@ class ControlCmdType(IntEnum):
 
 @dataclass
 class ControlCommand:
-    """Dataclass containing information about control command for Network
-    Application.
+    """Dataclass containing information about control command for Network Application.
 
     Args:
         cmd_type (ControlCmdType): Type of the command to be sent.
-        clear_queue (bool, optional): Clear previous unprocessed data (if any)
-            in the internal queue. Default is False.
-        data (dict, optional): Data to be passed along with the command,
-            e.g. new state data in case of command with type
-            ControlCmdType.SET_STATE.
+        clear_queue (bool, optional): Clear previous unprocessed data (if any) in the internal queue. Default is False.
+        data (Dict, optional): Data to be passed along with the command, e.g. new state data in case of command with
+            type ControlCmdType.SET_STATE.
     """
 
     cmd_type: ControlCmdType
     clear_queue: bool = False
-    data: dict = field(default_factory=dict)
+    data: Optional[Dict] = field(default_factory=dict)

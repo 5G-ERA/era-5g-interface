@@ -31,7 +31,7 @@ class ClientChannels(Channels):
         self._sio.on(DATA_ERROR_EVENT, lambda data: self.data_error_callback(data), namespace=DATA_NAMESPACE)
 
         for event, callback_info in self._callbacks_info.items():
-            logger.debug(f"Registering event '{event}' of type '{callback_info.type}'.")
+            logger.info(f"Creating client channels callback, type: {callback_info.type}, event: '{event}'")
             if callback_info.type is ChannelType.JSON:
                 self._sio.on(
                     event,
@@ -57,7 +57,9 @@ class ClientChannels(Channels):
     def send_data(
         self, data: Dict[str, Any], event: str, sid: Optional[str] = None, can_be_dropped: bool = True
     ) -> None:
-        """Send general JSON data.
+        """Send general JSON data via DATA_NAMESPACE.
+
+        NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
 
         Args:
             data (Dict[str, Any]): JSON data.
@@ -71,7 +73,7 @@ class ClientChannels(Channels):
         super().send_data(data, event, sid=sid)
 
     def json_callback(self, data: Dict[str, Any], event: str) -> None:
-        """Allows to receive general json data using the websocket transport.
+        """Allows to receive general json data on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): JSON data.
@@ -81,7 +83,7 @@ class ClientChannels(Channels):
         self._callbacks_info[event].callback(data)
 
     def image_callback(self, data: Dict[str, Any], event: str) -> None:
-        """Allows to receive jpeg or h264 encoded image using the websocket transport.
+        """Allows to receive JPEG or H.264 encoded image on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): Received dictionary with frame data.

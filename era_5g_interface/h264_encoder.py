@@ -18,11 +18,11 @@ class H264EncoderError(FFmpegError):
 # TODO: only for testing purpose
 # Path("input").mkdir(parents=True, exist_ok=True)
 
-logger = logging.getLogger("H264 encoder")
+logger = logging.getLogger("H.264 encoder")
 
 
 class H264Encoder:
-    """H264 Encoder."""
+    """H.264 Encoder."""
 
     def __init__(self, width: int, height: int, fps: float = 30, options: Optional[Dict[str, str]] = None) -> None:
         """Constructor.
@@ -83,7 +83,7 @@ class H264Encoder:
         return self._fps
 
     def encoder_init(self) -> None:
-        """Init H264 encoder."""
+        """Init H.264 encoder."""
 
         self._init_count += 1
         self._encoder = CodecContext.create("h264", "w")

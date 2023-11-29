@@ -54,8 +54,8 @@ class CallbackInfoServer:
 class Channels(ABC):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264 encoding/decoding. The class cannot be used alone. The ServerChannels and
-    ClientChannels classes create callbacks and encoders/decoders.
+    It handles image frames JPEG and H.264 encoding/decoding. Data is sent via the DATA_NAMESPACE. The class cannot be
+    used alone. The ServerChannels and ClientChannels classes create callbacks and encoders/decoders.
     """
 
     # This should work roughly like an abstract member.
@@ -107,7 +107,9 @@ class Channels(ABC):
         can_be_dropped: bool = True,
         encoding_options: Optional[Dict[str, str]] = None,
     ) -> None:
-        """Send general image data with JPEG or H.264 encoding.
+        """Send general image data with JPEG or H.264 encoding via DATA_NAMESPACE.
+
+        NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
 
         Args:
             frame (np.ndarray): Video frame / image.
@@ -137,8 +139,12 @@ class Channels(ABC):
 
         if channel_type is ChannelType.H264:
             if eio_sid not in self._encoders:
-                self._encoders[eio_sid] = H264Encoder(frame.shape[1], frame.shape[0], options=encoding_options)
-
+                try:
+                    logger.info(f"Creating H.264 encoder for image size {frame.shape[1]}x{frame.shape[0]}")
+                    self._encoders[eio_sid] = H264Encoder(frame.shape[1], frame.shape[0], options=encoding_options)
+                except Exception as e:
+                    logger.error(f"Cannot create H.264 encoder: {repr(e)}")
+                    raise e
         try:
             is_key_frame = True
             if channel_type is ChannelType.H264:
@@ -159,7 +165,7 @@ class Channels(ABC):
 
             self.send_data(data, event, sid, can_be_dropped and is_key_frame)
         except H264EncoderError as e:
-            logger.error(f"H264 encoder error: {e}")
+            logger.error(f"H.264 encoder error: {e}")
             # Try to recreate encoder
             if self._encoders[eio_sid].get_init_count() < self._recreate_h264_attempts_count:
                 logger.info(f"Try to recreate encoder ... attempt {self._encoders[eio_sid].get_init_count()}")
@@ -170,7 +176,9 @@ class Channels(ABC):
     def send_data(
         self, data: Dict[str, Any], event: str, sid: Optional[str] = None, can_be_dropped: bool = False
     ) -> None:
-        """Send general JSON data.
+        """Send general JSON data via DATA_NAMESPACE.
+
+        NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
 
         Args:
             data (Dict[str, Any]): JSON data.
@@ -214,7 +222,7 @@ class Channels(ABC):
         logger.error(f"Data error, eio_sid {self.get_client_eio_sid(sid, DATA_NAMESPACE)}, sid {sid}, data {data}")
 
     def image_decode(self, data: Dict[str, Any], event: str, sid: Optional[str] = None) -> Optional[Dict]:
-        """Allows to receive jpeg or h264 encoded image using the websocket transport.
+        """Decode JPEG or H.264 encoded image received on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): Received dictionary with frame data.
@@ -239,7 +247,28 @@ class Channels(ABC):
 
         eio_sid = self.get_client_eio_sid(sid, DATA_NAMESPACE)
         if self._callbacks_info[event].type is ChannelType.H264 and eio_sid not in self._decoders:
-            self._decoders[eio_sid] = H264Decoder(data["width"], data["height"])
+            if "width" not in data or "height" not in data:
+                logger.error("Data does not contain width or height, it is mandatory for H.264.")
+                self.send_data(
+                    {
+                        "timestamp": timestamp,
+                        "error": "Data does not contain width or height, it is mandatory for H.264.",
+                    },
+                    self._callbacks_info[event].error_event,
+                    sid=sid,
+                )
+                return None
+            try:
+                logger.info(f"Creating H.264 decoder for image size {data['width']}x{data['height']}")
+                self._decoders[eio_sid] = H264Decoder(data["width"], data["height"])
+            except Exception as e:
+                logger.error(f"Cannot create H.264 decoder: {repr(e)}")
+                self.send_data(
+                    {"timestamp": timestamp, "error": f"Cannot create H.264 decoder: {repr(e)}"},
+                    self._callbacks_info[event].error_event,
+                    sid=sid,
+                )
+                return None
 
         if eio_sid in self._decoders:
             last_timestamp = self._decoders[eio_sid].last_timestamp
@@ -264,13 +293,13 @@ class Channels(ABC):
             try:
                 frame_decoded = self._decoders[eio_sid].decode_packet_data(data["frame"])
             except H264DecoderError as e:
-                logger.error(f"H264 decoder error: {e}")
+                logger.error(f"H.264 decoder error: {e}")
                 # Try to recreate decoder
                 if self._decoders[eio_sid].get_init_count() < self._recreate_h264_attempts_count:
                     logger.info(f"Try to recreate decoder ... attempt {self._decoders[eio_sid].get_init_count()}")
                     self._decoders[eio_sid].decoder_init()
                 self.send_data(
-                    {"timestamp": timestamp, "error": f"H264 decoder error: {e}"},
+                    {"timestamp": timestamp, "error": f"H.264 decoder error: {e}"},
                     self._callbacks_info[event].error_event,
                     sid=sid,
                 )
@@ -278,10 +307,10 @@ class Channels(ABC):
         else:
             try:
                 frame_decoded = cv2.imdecode(np.frombuffer(data["frame"], dtype=np.uint8), cv2.IMREAD_COLOR)
-            except Exception as ex:
-                logger.error(f"Failed to decode frame data: {repr(ex)}")
+            except Exception as e:
+                logger.error(f"Failed to decode frame data: {repr(e)}")
                 self.send_data(
-                    {"timestamp": timestamp, "error": f"Failed to decode frame data: {repr(ex)}"},
+                    {"timestamp": timestamp, "error": f"Failed to decode frame data: {repr(e)}"},
                     self._callbacks_info[event].error_event,
                     sid=sid,
                 )

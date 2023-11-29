@@ -31,18 +31,21 @@ class ClientChannels(Channels):
         self._sio.on(DATA_ERROR_EVENT, lambda data: self.data_error_callback(data), namespace=DATA_NAMESPACE)
 
         for event, callback_info in self._callbacks_info.items():
+            logger.debug(f"Registering event '{event}' of type '{callback_info.type}'.")
             if callback_info.type is ChannelType.JSON:
                 self._sio.on(
                     event,
                     lambda data, local_event=event: self.json_callback(data, local_event),
                     namespace=DATA_NAMESPACE,
                 )
-            if callback_info.type is ChannelType.JPEG or callback_info.type is ChannelType.H264:
+            elif callback_info.type in (ChannelType.JPEG, ChannelType.H264):
                 self._sio.on(
                     event,
                     lambda data, local_event=event: self.image_callback(data, local_event),
                     namespace=DATA_NAMESPACE,
                 )
+            else:
+                raise ValueError(f"Unknown channel type: {callback_info.type}")
 
     def _apply_back_pressure(self) -> None:
         """Apply back pressure."""

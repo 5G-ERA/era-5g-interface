@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ServerChannels(Channels):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264 encoding/decoding.
+    It handles image frames JPEG and H.264 encoding/decoding. Data is sent via the DATA_NAMESPACE.
     """
 
     _callbacks_info: Dict[str, CallbackInfoServer]
@@ -31,6 +31,7 @@ class ServerChannels(Channels):
         self._sio.on(DATA_ERROR_EVENT, lambda sid, data: self.data_error_callback(data, sid), namespace=DATA_NAMESPACE)
 
         for event, callback_info in self._callbacks_info.items():
+            logger.info(f"Creating server channels callback, type: {callback_info.type}, event: '{event}'")
             if callback_info.type is ChannelType.JSON:
                 self._sio.on(
                     event,
@@ -59,7 +60,9 @@ class ServerChannels(Channels):
     def send_data(
         self, data: Dict[str, Any], event: str, sid: Optional[str] = None, can_be_dropped: bool = False
     ) -> None:
-        """Send general JSON data.
+        """Send general JSON data via DATA_NAMESPACE.
+
+        NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
 
         Args:
             data (Dict[str, Any]): JSON data.
@@ -73,7 +76,7 @@ class ServerChannels(Channels):
         super().send_data(data, event, sid=sid)
 
     def json_callback(self, data: Dict[str, Any], event: str, sid: str) -> None:
-        """Allows to receive general json data using the websocket transport.
+        """Allows to receive general json data on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): JSON data.
@@ -84,7 +87,7 @@ class ServerChannels(Channels):
         self._callbacks_info[event].callback(sid, data)
 
     def image_callback(self, data: Dict[str, Any], event: str, sid: str) -> None:
-        """Allows to receive jpeg or h264 encoded image using the websocket transport.
+        """Allows to receive JPEG or H.264 encoded image on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): Received dictionary with frame data.

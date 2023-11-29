@@ -189,6 +189,8 @@ class Channels(ABC):
         if isinstance(self._sio, socketio.Client):
             self._sio.emit(event, data, namespace=DATA_NAMESPACE)
         else:
+            if sid is None:
+                raise ValueError("'sid' has to be set for server.")
             self._sio.emit(event, data, namespace=DATA_NAMESPACE, to=sid)
 
     def get_client_eio_sid(self, sid: Optional[str] = None, namespace: Optional[str] = None) -> str:
@@ -205,6 +207,8 @@ class Channels(ABC):
         if isinstance(self._sio, socketio.Client):
             return str(self._sio.sid)
         else:
+            if sid is None:
+                raise ValueError("'sid' has to be set for server.")
             return str(self._sio.manager.eio_sid_from_sid(sid, namespace))
 
     def data_error_callback(self, data: Dict[str, Any], sid: Optional[str] = None) -> None:

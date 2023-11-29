@@ -38,12 +38,14 @@ class ServerChannels(Channels):
                     lambda sid, data, local_event=event: self.json_callback(data, local_event, sid),
                     namespace=DATA_NAMESPACE,
                 )
-            if callback_info.type is ChannelType.JPEG or callback_info.type is ChannelType.H264:
+            elif callback_info.type in (ChannelType.JPEG, ChannelType.H264):
                 self._sio.on(
                     event,
                     lambda sid, data, local_event=event: self.image_callback(data, local_event, sid),
                     namespace=DATA_NAMESPACE,
                 )
+            else:
+                raise ValueError(f"Unknown channel type: {callback_info.type}")
 
     def _apply_back_pressure(self, sid: Optional[str] = None) -> None:
         """Apply back pressure.

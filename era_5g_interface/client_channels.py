@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ClientChannels(Channels):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264 encoding/decoding.
+    It handles image frames JPEG and H.264 encoding/decoding. Data is sent via the DATA_NAMESPACE.
     """
 
     _callbacks_info: Dict[str, CallbackInfoClient]

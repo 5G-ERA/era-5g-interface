@@ -49,6 +49,7 @@ Task handler which takes care of passing the data to the python internal queue f
   - `./pants fmt ::` - format all code according to our standard.
   - `./pants lint ::` - checks formatting and few more things.
   - `./pants check ::` - runs type checking (mypy).
+  - `./pants test ::` - runs Pytest tests.
 - The same checks will be run within CI.
 - A virtual environment with all necessary dependencies can be generated using `./pants export ::`. 
   You may then activate the environment and add `era_5g_interface` to your `PYTHONPATH`, which is equivalent 

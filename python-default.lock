@@ -10,8 +10,7 @@
 //   ],
 //   "generated_with_requirements": [
 //     "av>=11.0.0",
-//     "flask==2.2.*",
-//     "flask_socketio==5.3.*",
+//     "flask>=3.0.0",
 //     "numpy>=1.24.4",
 //     "opencv-python>=4.7",
 //     "python-socketio[client]>=5.10.0",
@@ -261,6 +260,24 @@
           ],
           "requires_python": ">=3.7",
           "version": "0.22.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "c3f865d4d54db7abc53758a01601cf343fe55b84c1de4e3fa910e420b438d5b9",
+              "url": "https://files.pythonhosted.org/packages/fa/2a/7f3714cbc6356a0efec525ce7a0613d581072ed6eb53eb7b9754f33db807/blinker-1.7.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "e6820ff6fa4e4d1d8e2747c2283749c3f547e4fee112b98555cdcdae32996182",
+              "url": "https://files.pythonhosted.org/packages/a1/13/6df5fc090ff4e5d246baf1f45fe9e5623aa8565757dfa5bd243f6a545f9e/blinker-1.7.0.tar.gz"
+            }
+          ],
+          "project_name": "blinker",
+          "requires_dists": [],
+          "requires_python": ">=3.8",
+          "version": "1.7.0"
         },
         {
           "artifacts": [
@@ -648,49 +665,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "58107ed83443e86067e41eff4631b058178191a355886f8e479e347fa1285fdf",
-              "url": "https://files.pythonhosted.org/packages/9f/1a/8b6d48162861009d1e017a9740431c78d860809773b66cac220a11aa3310/Flask-2.2.5-py3-none-any.whl"
+              "hash": "21128f47e4e3b9d597a3e8521a329bf56909b690fcc3fa3e477725aa81367638",
+              "url": "https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "edee9b0a7ff26621bd5a8c10ff484ae28737a2410d99b0bb9a6850c7fb977aa0",
-              "url": "https://files.pythonhosted.org/packages/5f/76/a4d2c4436dda4b0a12c71e075c508ea7988a1066b06a575f6afe4fecc023/Flask-2.2.5.tar.gz"
+              "hash": "cfadcdb638b609361d29ec22360d6070a77d7463dcb3ab08d2c2f2f168845f58",
+              "url": "https://files.pythonhosted.org/packages/d8/09/c1a7354d3925a3c6c8cfdebf4245bae67d633ffda1ba415add06ffc839c5/flask-3.0.0.tar.gz"
             }
           ],
           "project_name": "flask",
           "requires_dists": [
-            "Jinja2>=3.0",
-            "Werkzeug>=2.2.2",
+            "Jinja2>=3.1.2",
+            "Werkzeug>=3.0.0",
             "asgiref>=3.2; extra == \"async\"",
-            "click>=8.0",
+            "blinker>=1.6.2",
+            "click>=8.1.3",
             "importlib-metadata>=3.6.0; python_version < \"3.10\"",
-            "itsdangerous>=2.0",
+            "itsdangerous>=2.1.2",
             "python-dotenv; extra == \"dotenv\""
           ],
-          "requires_python": ">=3.7",
-          "version": "2.2.5"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "9e62d2131842878ae6bfdd7067dfc3be397c1f2b117ab1dc74e6fe74aad7a579",
-              "url": "https://files.pythonhosted.org/packages/56/c8/dc0be9e26272dc89342868ecc2d9ddb9e31002b4b8e49fdb754aa0f9ecbf/Flask_SocketIO-5.3.6-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "bb8f9f9123ef47632f5ce57a33514b0c0023ec3696b2384457f0fcaa5b70501c",
-              "url": "https://files.pythonhosted.org/packages/33/b2/aa882384d130523d7d2d6eed33403aed68a438622df388d92171d7657960/Flask-SocketIO-5.3.6.tar.gz"
-            }
-          ],
-          "project_name": "flask-socketio",
-          "requires_dists": [
-            "Flask>=0.9",
-            "python-socketio>=5.0.2",
-            "sphinx; extra == \"docs\""
-          ],
-          "requires_python": ">=3.6",
-          "version": "5.3.6"
+          "requires_python": ">=3.8",
+          "version": "3.0.0"
         },
         {
           "artifacts": [
@@ -1419,8 +1415,7 @@
   "prefer_older_binary": false,
   "requirements": [
     "av>=11.0.0",
-    "flask==2.2.*",
-    "flask_socketio==5.3.*",
+    "flask>=3.0.0",
     "numpy>=1.24.4",
     "opencv-python>=4.7",
     "python-socketio[client]>=5.10.0",

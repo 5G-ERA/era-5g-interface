@@ -45,15 +45,16 @@ Task handler which takes care of passing the data to the python internal queue f
 
 - The package is developed and tested with Python 3.8.
 - Any contribution should go through a pull request from your fork.
+- We use Pants to manage the code ([https://www.pantsbuild.org/docs/installation](how to install it)).
 - Before committing, please run locally:
-  - `./pants fmt ::` - format all code according to our standard.
-  - `./pants lint ::` - checks formatting and few more things.
-  - `./pants check ::` - runs type checking (mypy).
-  - `./pants test ::` - runs Pytest tests.
+  - `pants fmt ::` - format all code according to our standard.
+  - `pants lint ::` - checks formatting and few more things.
+  - `pants check ::` - runs type checking (mypy).
+  - `pants test ::` - runs Pytest tests.
 - The same checks will be run within CI.
-- A virtual environment with all necessary dependencies can be generated using `./pants export ::`. 
+- A virtual environment with all necessary dependencies can be generated using `pants export ::`. 
   You may then activate the environment and add `era_5g_interface` to your `PYTHONPATH`, which is equivalent 
   to installing a package using `pip install -e`.
-- To generate distribution packages (`tar.gz` and `whl`), you may run `./pants package ::`.
+- To generate distribution packages (`tar.gz` and `whl`), you may run `pants package ::`.
 - For commit messages, please stick to
   [https://www.conventionalcommits.org/en/v1.0.0/](https://www.conventionalcommits.org/en/v1.0.0/).

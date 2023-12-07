@@ -2,7 +2,9 @@ av>=11.0.0
 numpy>=1.24.4
 opencv-python>=4.7
 python-socketio[client]>=5.10.0
+
+# this could go to mypy.txt but it does not work for some reason
 types-requests>=2.31.0.10
 
-# this could go to pytest.txt
+# this is only used by pytest and mypy
 flask>=3.0.0

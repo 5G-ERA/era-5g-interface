@@ -23,7 +23,9 @@ class ServerChannels(Channels):
         Args:
             sio (socketio.Server): Socketio Server object.
             callbacks_info (Dict[str, CallbackInfoServer]): Callbacks Info dictionary, key is custom event name.
-            **kw: Channels arguments.
+            back_pressure_size (int, optional): Back pressure size - max size of eio.queue.qsize().
+            recreate_h264_attempts_count (int): How many times try to recreate the H.264 encoder/decoder.
+            stats (bool): Store output data sizes.
         """
 
         super().__init__(sio, callbacks_info, **kwargs)

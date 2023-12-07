@@ -65,7 +65,7 @@ class Channels(ABC):
         self,
         sio: Union[socketio.Client, socketio.Server],
         callbacks_info: Union[Dict[str, CallbackInfoClient], Dict[str, CallbackInfoServer]],
-        back_pressure_size: int = 5,
+        back_pressure_size: Optional[int] = 5,
         recreate_h264_attempts_count: int = 5,
         stats: bool = False,
     ):
@@ -75,8 +75,8 @@ class Channels(ABC):
             sio (Union[socketio.Client, socketio.Server]): Socketio Client or Server object.
             callbacks_info (Union[Dict[str, CallbackInfoClient], Dict[str, CallbackInfoServer]]): Callbacks Info
                 dictionary, key is custom event name.
-            back_pressure_size (int): Back pressure size - max size of eio.queue.qsize().
-            recreate_h264_attempts_count (int): How many times try to recreate the H.264 encoder.
+            back_pressure_size (int, optional): Back pressure size - max size of eio.queue.qsize().
+            recreate_h264_attempts_count (int): How many times try to recreate the H.264 encoder/decoder.
             stats (bool): Store output data sizes.
         """
 

@@ -1,10 +1,9 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import socketio
 
 from era_5g_interface.channels import DATA_ERROR_EVENT, DATA_NAMESPACE, CallbackInfoClient, Channels, ChannelType
-from era_5g_interface.exceptions import BackPressureException
 
 logger = logging.getLogger(__name__)
 
@@ -48,31 +47,6 @@ class ClientChannels(Channels):
                 )
             else:
                 raise ValueError(f"Unknown channel type: {callback_info.type}")
-
-    def _apply_back_pressure(self) -> None:
-        """Apply back pressure."""
-
-        if self._back_pressure_size is not None:
-            if self._sio.eio.queue.qsize() > self._back_pressure_size:
-                raise BackPressureException()
-
-    def send_data(
-        self, data: Dict[str, Any], event: str, sid: Optional[str] = None, can_be_dropped: bool = True
-    ) -> None:
-        """Send general JSON data via DATA_NAMESPACE.
-
-        NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
-
-        Args:
-            data (Dict[str, Any]): JSON data.
-            event (str): Event name.
-            sid (str, optional): Namespace sid - mandatory when sending from the server side to the client.
-            can_be_dropped (bool): If data can be lost due to back pressure.
-        """
-
-        if can_be_dropped:
-            self._apply_back_pressure()
-        super().send_data(data, event, sid=sid)
 
     def json_callback(self, data: Dict[str, Any], event: str) -> None:
         """Allows to receive general json data on DATA_NAMESPACE.

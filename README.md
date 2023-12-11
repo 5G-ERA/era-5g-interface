@@ -45,7 +45,7 @@ Task handler which takes care of passing the data to the python internal queue f
 
 - The package is developed and tested with Python 3.8.
 - Any contribution should go through a pull request from your fork.
-- We use Pants to manage the code ([https://www.pantsbuild.org/docs/installation](how to install it)).
+- We use Pants to manage the code ([how to install it](https://www.pantsbuild.org/docs/installation)).
 - Before committing, please run locally:
   - `pants fmt ::` - format all code according to our standard.
   - `pants lint ::` - checks formatting and few more things.

@@ -39,6 +39,12 @@ class ServerChannels(Channels):
                     lambda sid, data, local_event=event: self.json_callback(data, local_event, sid),
                     namespace=DATA_NAMESPACE,
                 )
+            elif callback_info.type is ChannelType.JSON_LZ4:
+                self._sio.on(
+                    event,
+                    lambda sid, data, local_event=event: self.json_lz4_callback(data, local_event, sid),
+                    namespace=DATA_NAMESPACE,
+                )
             elif callback_info.type in (ChannelType.JPEG, ChannelType.H264):
                 self._sio.on(
                     event,
@@ -49,7 +55,7 @@ class ServerChannels(Channels):
                 raise ValueError(f"Unknown channel type: {callback_info.type}")
 
     def json_callback(self, data: Dict[str, Any], event: str, sid: str) -> None:
-        """Allows to receive general json data on DATA_NAMESPACE.
+        """Allows to receive general JSON data on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): JSON data.
@@ -58,6 +64,19 @@ class ServerChannels(Channels):
         """
 
         self._callbacks_info[event].callback(sid, data)
+
+    def json_lz4_callback(self, data: bytes, event: str, sid: str) -> None:
+        """Allows to receive LZ4 compressed general JSON data on DATA_NAMESPACE.
+
+        Args:
+            data (bytes): LZ4 compressed JSON data.
+            event (str): Event name.
+            sid (str, optional): Namespace sid - only on the server side.
+        """
+
+        decoded_data = super().data_lz4_decode(data, event, sid)
+        if decoded_data:
+            self.json_callback(decoded_data, event, sid)
 
     def image_callback(self, data: Dict[str, Any], event: str, sid: str) -> None:
         """Allows to receive JPEG or H.264 encoded image on DATA_NAMESPACE.

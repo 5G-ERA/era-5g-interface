@@ -1,7 +1,8 @@
 import logging
 import math
 import os
-from typing import Dict, List
+from threading import Event, Thread
+from typing import Callable, Dict, List
 
 import numpy as np
 import requests
@@ -54,6 +55,35 @@ class LatencyMeasurements:
         return float(np.mean(self.processing_latencies))
 
 
+class RepeatedTimer(Thread):
+    """Repeated interval timer of callback function in Thread."""
+
+    def __init__(self, interval: float, callback: Callable):
+        """Constructor.
+
+        Args:
+            interval (float): Interval in seconds.
+            callback (Callable): Function to be called repeatedly.
+        """
+
+        super().__init__(daemon=True)
+        self._stop_event = Event()
+        self._callback = callback
+        self._interval = interval
+
+    def stop(self) -> None:
+        """Set stop event to stop FCW worker."""
+
+        self._stop_event.set()
+
+    def run(self):
+        """Periodically calls callback function."""
+
+        self._stop_event = Event()
+        while not self._stop_event.wait(self._interval):
+            self._callback()
+
+
 class HeartBeatSender:
     """HeartBeat to Middleware sender."""
 
@@ -75,17 +105,17 @@ class HeartBeatSender:
 
         Args:
             headers (Dict): Request headers.
-            json (Dict): Request json.
+            json (Dict): Request JSON.
         """
 
         if not self.connection_error:
-            logger.info(f"Sending heart beat to middleware: {json}")
+            logger.debug(f"Sending heart beat to middleware: {json}")
             try:
                 response = self.session.post(MIDDLEWARE_ADDRESS, headers=headers, json=json, timeout=(0.2, 0.2))
                 if response.ok:
                     logger.debug(f"Middleware heart_beat response: {response.text}")
                 else:
-                    logger.warning(f"Middleware heart_beat response: {response.text}")
+                    logger.warning(f"Middleware heart_beat response: {response}")
                     self.connection_error = True
             except requests.RequestException as ex:
                 logger.warning(f"Failed to connect to the middleware address: {MIDDLEWARE_ADDRESS}, {repr(ex)}")
@@ -130,5 +160,3 @@ class HeartBeatSender:
         }
         headers = {"Content-type": "application/json"}
         self._send_middleware_heart_beat_request(headers=headers, json=data)
-        # TODO: only for testing purpose
-        # logger.info(f"Heart beat published to middleware: {data}")

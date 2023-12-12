@@ -29,7 +29,7 @@ classes create callbacks and encoders/decoders.
 
 ### ClientChannels and ServerChannels ([client_channels.py](era_5g_interface/client_channels.py), [server_channels.py](era_5g_interface/server_channels.py))
 
-ClientChannels and ServerChannels classes are used to define bidirectional channel (image ans json) callbacks and contains 
+ClientChannels and ServerChannels classes are used to define bidirectional channel (image ans JSON) callbacks and contains 
 send functions. They are used inside the NetAppClientBase in era_5g_client and NetworkApplicationServer in 
 era_5g_server. ServerChannels is used with Socketio Server object, ClientChannels is used with Socketio Client object.
 

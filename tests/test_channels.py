@@ -47,13 +47,20 @@ def test_channels() -> None:
     def client_json_callback(data: Dict) -> None:
         pass
 
-    ServerChannels(sio, {"test": CallbackInfoServer(ChannelType.JSON, server_json_callback)})
+    ServerChannels(
+        sio,
+        {
+            "test": CallbackInfoServer(ChannelType.JSON, server_json_callback),
+            "test_lz4": CallbackInfoServer(ChannelType.JSON_LZ4, server_json_callback),
+        },
+    )
 
     client = socketio.Client()
     time.sleep(1)  # not sure why wait_timeout is not enough
-    client.connect(f"http://0.0.0.0:{port}", wait_timeout=5, namespaces=[DATA_NAMESPACE])
+    client.connect(f"http://localhost:{port}", wait_timeout=5, namespaces=[DATA_NAMESPACE])
 
     client_ch = ClientChannels(client, {"test": CallbackInfoClient(ChannelType.JSON, client_json_callback)})
     client_ch.send_data(test_data, "test")
+    client_ch.send_data(test_data, "test_lz4", channel_type=ChannelType.JSON_LZ4)
 
     assert server_got_data.wait(5)

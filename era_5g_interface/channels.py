@@ -2,12 +2,14 @@ import logging
 import time
 from abc import ABC
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, unique
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
 import socketio
+import ujson
+from lz4.frame import compress, decompress
 
 from era_5g_interface.exceptions import BackPressureException, UnknownChannelTypeUsed
 from era_5g_interface.h264_decoder import H264Decoder, H264DecoderError
@@ -25,12 +27,14 @@ COMMAND_ERROR_EVENT = str("command_error")
 COMMAND_RESULT_EVENT = str("command_result")
 
 
+@unique
 class ChannelType(Enum):
     """Channel type dataclass."""
 
     JSON = 1
     JPEG = 2
     H264 = 3
+    JSON_LZ4 = 4
 
 
 @dataclass
@@ -176,7 +180,12 @@ class Channels(ABC):
                 # TODO: include all data size
                 self._sizes.append(len(frame_encoded))
                 logger.debug(f"Frame data size: {self._sizes[-1]}")
-            self.send_data(data, event, sid, can_be_dropped and not is_key_frame)
+            self.send_data(
+                data,
+                event,
+                sid=sid,
+                can_be_dropped=(can_be_dropped and not is_key_frame),
+            )
         except H264EncoderError as e:
             logger.error(f"H.264 encoder error: {e}")
             # Try to recreate encoder
@@ -187,7 +196,12 @@ class Channels(ABC):
                 raise e
 
     def send_data(
-        self, data: Dict[str, Any], event: str, sid: Optional[str] = None, can_be_dropped: bool = False
+        self,
+        data: Dict[str, Any],
+        event: str,
+        channel_type: ChannelType = ChannelType.JSON,
+        sid: Optional[str] = None,
+        can_be_dropped: bool = False,
     ) -> None:
         """Send general JSON data via DATA_NAMESPACE.
 
@@ -196,22 +210,31 @@ class Channels(ABC):
         Args:
             data (Dict[str, Any]): JSON data.
             event (str): Event name.
+            channel_type (ChannelType): ChannelType.JSON for raw JSON or ChannelType.JSON_LZ4 for LZ4 compressed JSON.
             sid (str, optional): Namespace sid - mandatory when sending from the server side to the client.
             can_be_dropped (bool): If data can be lost due to back pressure.
         """
 
+        if channel_type is not ChannelType.JSON and channel_type is not ChannelType.JSON_LZ4:
+            raise UnknownChannelTypeUsed()
+
         if can_be_dropped:
             self._apply_back_pressure(sid)
+
+        new_data = data
+        if channel_type is ChannelType.JSON_LZ4:
+            new_data = compress(bytes(ujson.dumps(data), "utf-8"))
+
         if isinstance(self._sio, socketio.Client):
             if not self._sio.connected:  # self.eio.state == 'connected'
                 raise ConnectionError("Client is not connected to server.")
-            self._sio.emit(event, data, namespace=DATA_NAMESPACE)
+            self._sio.emit(event, new_data, namespace=DATA_NAMESPACE)
         else:
             if sid is None:
                 raise ValueError("'sid' has to be set for server.")
             if not self._sio.manager.is_connected(sid, DATA_NAMESPACE):
                 raise ConnectionError("Client is not connected to server.")
-            self._sio.emit(event, data, namespace=DATA_NAMESPACE, to=sid)
+            self._sio.emit(event, new_data, namespace=DATA_NAMESPACE, to=sid)
 
     def get_client_eio_sid(self, sid: Optional[str] = None, namespace: Optional[str] = None) -> str:
         """Get client eio sid.
@@ -342,6 +365,27 @@ class Channels(ABC):
             decoded_data["metadata"] = data["metadata"]
 
         return decoded_data
+
+    def data_lz4_decode(self, data: bytes, event: str, sid: Optional[str] = None) -> Optional[Dict]:
+        """Decode LZ4 compressed general JSON data received on DATA_NAMESPACE.
+
+        Args:
+            data (bytes): LZ4 compressed JSON data.
+            event (str): Event name.
+            sid (str, optional): Namespace sid - only on the server side.
+        """
+
+        try:
+            new_data: Dict = ujson.loads(decompress(data))
+            return new_data
+        except Exception as e:
+            logger.error(f"Failed to decode LZ4 JSON data: {repr(e)}")
+            self.send_data(
+                {"error": f"Failed to decode LZ4 JSON data: {repr(e)}"},
+                self._callbacks_info[event].error_event,
+                sid=sid,
+            )
+            return None
 
     @property
     def stats(self):

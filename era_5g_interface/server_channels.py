@@ -63,7 +63,12 @@ class ServerChannels(Channels):
             sid (str, optional): Namespace sid - only on the server side.
         """
 
-        self._callbacks_info[event].callback(sid, data)
+        cb_info = self._callbacks_info[event]
+
+        try:
+            cb_info.callback(sid, data)
+        except Exception:
+            Channels._shutdown("JSON", event)
 
     def json_lz4_callback(self, data: bytes, event: str, sid: str) -> None:
         """Allows to receive LZ4 compressed general JSON data on DATA_NAMESPACE.
@@ -87,6 +92,11 @@ class ServerChannels(Channels):
             sid (str, optional): Namespace sid - only on the server side.
         """
 
+        cb_info = self._callbacks_info[event]
+
         decoded_data = super().image_decode(data, event, sid)
         if decoded_data:
-            self._callbacks_info[event].callback(sid, decoded_data)
+            try:
+                cb_info.callback(sid, decoded_data)
+            except Exception:
+                Channels._shutdown("image", event)

@@ -131,6 +131,7 @@ class Channels(ABC):
         metadata: Optional[Dict[str, Any]] = None,
         sid: Optional[str] = None,
         can_be_dropped: bool = True,
+        wait_for_reconnection: bool = True,
         encoding_options: Optional[Dict[str, str]] = None,
     ) -> None:
         """Send general image data with JPEG or H.264 encoding via DATA_NAMESPACE.
@@ -145,6 +146,7 @@ class Channels(ABC):
             metadata (Dict[str, Any], optional): Optional metadata to send.
             sid (str, optional): Namespace sid - mandatory when sending from the server side to the client.
             can_be_dropped (bool): If data can be lost due to back pressure.
+            wait_for_reconnection (bool): Wait for reconnection to server side? Wait is blocking.
             encoding_options (Dict[str, str], optional): ChannelType.H264 options, e.g. {"crf": "0", "preset":
                 "ultrafast", "tune": "zerolatency", "x264-params": "keyint=5"}, default: {"preset": "ultrafast",
                 "tune": "zerolatency"}.
@@ -210,6 +212,7 @@ class Channels(ABC):
         channel_type: ChannelType = ChannelType.JSON,
         sid: Optional[str] = None,
         can_be_dropped: bool = False,
+        wait_for_reconnection: bool = True,
     ) -> None:
         """Send general JSON data via DATA_NAMESPACE.
 
@@ -221,6 +224,7 @@ class Channels(ABC):
             channel_type (ChannelType): ChannelType.JSON for raw JSON or ChannelType.JSON_LZ4 for LZ4 compressed JSON.
             sid (str, optional): Namespace sid - mandatory when sending from the server side to the client.
             can_be_dropped (bool): If data can be lost due to back pressure.
+            wait_for_reconnection (bool): Wait for reconnection to server side? Wait is blocking.
         """
 
         if channel_type is not ChannelType.JSON and channel_type is not ChannelType.JSON_LZ4:
@@ -234,14 +238,18 @@ class Channels(ABC):
             new_data = compress(bytes(ujson.dumps(data), "utf-8"))
 
         if isinstance(self._sio, socketio.Client):
-            if not self._sio.connected:  # self.eio.state == 'connected'
-                raise ConnectionError("Client is not connected to server.")
+            if wait_for_reconnection:
+                while not self._sio.connected or not self._sio.eio.state:
+                    logger.info("Waiting for reconnection ...")
+                    if not self._sio._reconnect_task or not self._sio._reconnect_task.is_alive():
+                        break
+                    time.sleep(1)
             self._sio.emit(event, new_data, namespace=DATA_NAMESPACE)
         else:
             if sid is None:
                 raise ValueError("'sid' has to be set for server.")
             if not self._sio.manager.is_connected(sid, DATA_NAMESPACE):
-                raise ConnectionError("Client is not connected to server.")
+                raise ConnectionError(f"Client with {DATA_NAMESPACE} sid {sid} is not connected to server.")
             self._sio.emit(event, new_data, namespace=DATA_NAMESPACE, to=sid)
 
     def get_client_eio_sid(self, sid: Optional[str] = None, namespace: Optional[str] = None) -> str:

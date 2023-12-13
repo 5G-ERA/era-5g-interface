@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 import socketio
 
@@ -11,12 +11,18 @@ logger = logging.getLogger(__name__)
 class ServerChannels(Channels):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264 encoding/decoding. Data is sent via the DATA_NAMESPACE.
+    It handles image frames JPEG and H.264, and JSON LZ4 encoding/decoding. Data is sent via the DATA_NAMESPACE.
     """
 
     _callbacks_info: Dict[str, CallbackInfoServer]
 
-    def __init__(self, sio: socketio.Server, callbacks_info: Dict[str, CallbackInfoServer], **kwargs):
+    def __init__(
+        self,
+        sio: socketio.Server,
+        callbacks_info: Dict[str, CallbackInfoServer],
+        disconnect_callback: Optional[Callable] = None,
+        **kwargs,
+    ):
         """Constructor.
 
         Args:
@@ -28,6 +34,8 @@ class ServerChannels(Channels):
         """
 
         super().__init__(sio, callbacks_info, **kwargs)
+
+        self._disconnect_callback = disconnect_callback
 
         self._sio.on(DATA_ERROR_EVENT, lambda sid, data: self.data_error_callback(data, sid), namespace=DATA_NAMESPACE)
 
@@ -68,6 +76,8 @@ class ServerChannels(Channels):
         try:
             cb_info.callback(sid, data)
         except Exception:
+            if self._disconnect_callback:
+                self._disconnect_callback(sid, DATA_NAMESPACE)
             Channels._shutdown("JSON", event)
 
     def json_lz4_callback(self, data: bytes, event: str, sid: str) -> None:
@@ -99,4 +109,6 @@ class ServerChannels(Channels):
             try:
                 cb_info.callback(sid, decoded_data)
             except Exception:
+                if self._disconnect_callback:
+                    self._disconnect_callback(sid, DATA_NAMESPACE)
                 Channels._shutdown("image", event)

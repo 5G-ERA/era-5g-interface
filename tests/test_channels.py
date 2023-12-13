@@ -63,6 +63,7 @@ def test_channels() -> None:
             "test_lz4": CallbackInfoServer(ChannelType.JSON_LZ4, server_json_callback),
             "test_exception": CallbackInfoServer(ChannelType.JSON, server_json_exc_callback),
         },
+        disconnect_callback=None,
     )
 
     client = socketio.Client()
@@ -75,6 +76,7 @@ def test_channels() -> None:
             "test": CallbackInfoClient(ChannelType.JSON, client_json_callback),
             "test_exception": CallbackInfoClient(ChannelType.JSON, client_json_exc_callback),
         },
+        disconnect_callback=None,
     )
     client_ch.send_data(test_data, "test")
     assert server_got_data.wait(1)

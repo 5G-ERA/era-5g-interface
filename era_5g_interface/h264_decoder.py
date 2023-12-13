@@ -2,14 +2,14 @@ import logging
 
 import numpy as np
 from av.codec import CodecContext
-from av.error import FFmpegError
+from av.error import FFmpegError, tag_to_code
 from av.packet import Packet
 from av.video.codeccontext import VideoCodecContext
 from av.video.frame import VideoFrame
 
 
-class H264DecoderError(FFmpegError):
-    """FFmpegError Exception."""
+class H264DecoderError(Exception):
+    """H264DecoderError Exception."""
 
     pass
 
@@ -107,20 +107,30 @@ class H264Decoder:
             Video frame / image.
         """
 
-        packet = Packet(packet_data)
-        # TODO: only for testing purpose
-        # logger.info(f"Decoding packet: {packet}")
+        try:
+            packet = Packet(packet_data)
 
-        # Multiple frames? - This should not happen because on the encoders side one frame is always encoded and sent
-        frame: VideoFrame
-        for frame in self._decoder.decode(packet):
-            # TODO: only for testing purpose
-            # logger.info(f"Frame {frame} with id {frame.index} decoded from packet: {packet}")
-            # logger.info(f"frame.pts: {frame.pts}, frame.dts: {frame.dts}, frame.index: {frame.index}, "
-            #            f"frame.key_frame: {frame.key_frame}, frame.is_corrupt: {frame.is_corrupt}, "
-            #            f"frame.time: {frame.time}")
-            # frame.to_image().save('output/frame-%04d.jpg' % frame.index)
+            # Multiple frames? - This should not happen because on the encoders side one frame is always encoded and sent
+            frame: VideoFrame
+            for frame in self._decoder.decode(packet):
+                # TODO: only for testing purpose
+                # logger.debug(f"Frame {frame} with id {frame.index} decoded from packet: {packet}")
+                # logger.debug(
+                #    f"frame.pts: {frame.pts}, "
+                #    f"frame.dts: {frame.dts}, "
+                #    f"frame.index: {frame.index}, "
+                #    f"frame.key_frame: {frame.key_frame}, "
+                #    f"frame.is_corrupt: {frame.is_corrupt}, "
+                #    f"frame.time: {frame.time}"
+                # )
+                # TODO: only for testing purpose
+                # frame.to_image().save('output/frame-%04d.jpg' % frame.index)
 
-            self._last_frame_is_keyframe = frame.key_frame
-        frame_ndarray: np.ndarray = frame.to_ndarray(format=format)
-        return frame_ndarray
+                self._last_frame_is_keyframe = frame.key_frame
+                frame_ndarray: np.ndarray = frame.to_ndarray(format=format)
+                return frame_ndarray
+            # Sometimes, with dropping some TCP packets, no frame is decoded from av.Packet while no FFmpegError is
+            # raised. This is resolved by throwing this exception.
+            raise FFmpegError(tag_to_code(b"INDA"), f"No frame decoded from packet {packet}")
+        except FFmpegError as e:
+            raise H264DecoderError(e)

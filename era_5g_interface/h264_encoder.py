@@ -9,7 +9,7 @@ from av.video.codeccontext import VideoCodecContext
 from av.video.frame import VideoFrame
 
 
-class H264EncoderError(FFmpegError):
+class H264EncoderError(Exception):
     """FFmpegError Exception."""
 
     pass
@@ -122,22 +122,30 @@ class H264Encoder:
             Packet data.
         """
 
-        frame = VideoFrame.from_ndarray(frame_data, format=format)
-        # TODO: only for testing purpose
-        # frame.to_image().save('input/frame-%04d.jpg' % self.frame_id)
-        # self.frame_id += 1
-
-        self._last_frame_is_keyframe = False
-        packets = []
-        packet: Packet
-        for packet in self._encoder.encode(frame):
+        try:
+            frame = VideoFrame.from_ndarray(frame_data, format=format)
             # TODO: only for testing purpose
-            # logger.info(f"Frame {frame} encoded to packet: {packet}")
+            # frame.to_image().save('input/frame-%04d.jpg' % self.frame_id)
+            # self.frame_id += 1
 
-            if packet.is_keyframe:
-                self._last_frame_is_keyframe = True
-            packets.append(bytes(packet))
+            self._last_frame_is_keyframe = False
+            packets = []
+            packet: Packet
+            for packet in self._encoder.encode(frame):
+                # TODO: only for testing purpose
+                # logger.debug(f"Frame {frame} encoded to packet: {packet}")
+                # logger.debug(
+                #    f"packet.pts: {packet.pts}, "
+                #    f"packet.dts: {packet.dts}, "
+                #    f"packet.key_frame: {packet.is_keyframe}, "
+                #    f"packet.is_corrupt: {packet.is_corrupt}"
+                # )
+                if packet.is_keyframe:
+                    self._last_frame_is_keyframe = True
+                packets.append(bytes(packet))
 
-        if len(packets) > 1:
-            logger.info(f"Frame {frame} encoded to multiple packets: {packets}")
-        return b"".join(packets)
+            if len(packets) > 1:
+                logger.info(f"Frame {frame} encoded to multiple packets: {packets}")
+            return b"".join(packets)
+        except FFmpegError as e:
+            raise H264EncoderError(e)

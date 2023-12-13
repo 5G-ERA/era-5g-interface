@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 import socketio
 
@@ -11,23 +11,32 @@ logger = logging.getLogger(__name__)
 class ClientChannels(Channels):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264 encoding/decoding. Data is sent via the DATA_NAMESPACE.
+    It handles image frames JPEG and H.264, and JSON LZ4 encoding/decoding. Data is sent via the DATA_NAMESPACE.
     """
 
     _callbacks_info: Dict[str, CallbackInfoClient]
 
-    def __init__(self, sio: socketio.Client, callbacks_info: Dict[str, CallbackInfoClient], **kwargs):
+    def __init__(
+        self,
+        sio: socketio.Client,
+        callbacks_info: Dict[str, CallbackInfoClient],
+        disconnect_callback: Optional[Callable] = None,
+        **kwargs,
+    ):
         """Constructor.
 
         Args:
             sio (socketio.Client): Socketio Client object.
             callbacks_info (Dict[str, CallbackInfoClient]): Callbacks Info dictionary, key is custom event name.
+            disconnect_callback (Callable, optional): Triggered on client side before _shutdown on unhandled exception.
             back_pressure_size (int, optional): Back pressure size - max size of eio.queue.qsize().
             recreate_h264_attempts_count (int): How many times try to recreate the H.264 encoder/decoder.
             stats (bool): Store output data sizes.
         """
 
         super().__init__(sio, callbacks_info, **kwargs)
+
+        self._disconnect_callback = disconnect_callback
 
         self._sio.on(DATA_ERROR_EVENT, lambda data: self.data_error_callback(data), namespace=DATA_NAMESPACE)
 
@@ -67,6 +76,8 @@ class ClientChannels(Channels):
         try:
             cb_info.callback(data)
         except Exception:
+            if self._disconnect_callback:
+                self._disconnect_callback()
             Channels._shutdown("JSON", event)
 
     def json_lz4_callback(self, data: bytes, event: str) -> None:
@@ -96,4 +107,6 @@ class ClientChannels(Channels):
             try:
                 cb_info.callback(decoded_data)
             except Exception:
+                if self._disconnect_callback:
+                    self._disconnect_callback()
                 Channels._shutdown("image", event)

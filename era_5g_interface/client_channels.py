@@ -42,7 +42,7 @@ class ClientChannels(Channels):
             elif callback_info.type is ChannelType.JSON_LZ4:
                 self._sio.on(
                     event,
-                    lambda sid, data, local_event=event: self.json_lz4_callback(data, local_event),
+                    lambda data, local_event=event: self.json_lz4_callback(data, local_event),
                     namespace=DATA_NAMESPACE,
                 )
             elif callback_info.type in (ChannelType.JPEG, ChannelType.H264):
@@ -62,7 +62,12 @@ class ClientChannels(Channels):
             event (str): Event name.
         """
 
-        self._callbacks_info[event].callback(data)
+        cb_info = self._callbacks_info[event]
+
+        try:
+            cb_info.callback(data)
+        except Exception:
+            Channels._shutdown("JSON", event)
 
     def json_lz4_callback(self, data: bytes, event: str) -> None:
         """Allows to receive LZ4 compressed general JSON data on DATA_NAMESPACE.
@@ -84,6 +89,11 @@ class ClientChannels(Channels):
             event (str): Event name.
         """
 
+        cb_info = self._callbacks_info[event]
+
         decoded_data = super().image_decode(data, event)
         if decoded_data:
-            self._callbacks_info[event].callback(decoded_data)
+            try:
+                cb_info.callback(decoded_data)
+            except Exception:
+                Channels._shutdown("image", event)

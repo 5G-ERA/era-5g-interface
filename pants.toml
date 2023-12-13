@@ -23,7 +23,7 @@ root_patterns = ["/"]
 
 [python]
 interpreter_constraints = [">=3.8"]
-resolves = { python-default = "python-default.lock", flake8 = "flake8.lock", mypy = "mypy.lock"}
+resolves = { python-default = "python-default.lock", flake8 = "flake8.lock", mypy = "mypy.lock", pytest = "pytest.lock"}
 enable_resolves = true
 
 [python-bootstrap]
@@ -34,6 +34,9 @@ install_from_resolve = "flake8"
 
 [mypy]
 install_from_resolve = "mypy"
+
+[pytest]
+install_from_resolve = "pytest"
 
 [docformatter]
 args = ["--wrap-summaries=120", "--wrap-descriptions=120"]

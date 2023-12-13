@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 import time
 from abc import ABC
 from dataclasses import dataclass
@@ -41,7 +43,7 @@ class ChannelType(Enum):
 class CallbackInfoClient:
     """Callback info dataclass used on client side."""
 
-    type: ChannelType  # Channel type.
+    type: ChannelType
     callback: Callable[[Dict], None]  # Custom callback with dict.
     error_event: str = DATA_ERROR_EVENT  # Custom error event name.
 
@@ -50,7 +52,7 @@ class CallbackInfoClient:
 class CallbackInfoServer:
     """Callback info dataclass used on server side - callback has namespace sid parameter."""
 
-    type: ChannelType  # Channel type.
+    type: ChannelType
     callback: Callable[[str, Dict], None]  # Custom callback with sid and dict.
     error_event: str = DATA_ERROR_EVENT  # Custom error event name.
 
@@ -99,6 +101,12 @@ class Channels(ABC):
         # For multiple H.264 streams, the encoders and the decoders are indexed by Tuple(eio_sid, event).
         self._decoders: Dict[Tuple[str, str], H264Decoder] = dict()
         self._encoders: Dict[Tuple[str, str], H264Encoder] = dict()
+
+    @staticmethod
+    def _shutdown(cb_type: str, event: str) -> None:
+        logger.error(f"Unhandled exception in {cb_type} callback (event: {event}).", exc_info=sys.exc_info())
+        logging.shutdown()  # should flush the logger
+        os._exit(1)  # standard sys.exit() is not enough
 
     def _apply_back_pressure(self, sid: Optional[str] = None) -> None:
         """Apply back pressure."""
@@ -374,6 +382,8 @@ class Channels(ABC):
             event (str): Event name.
             sid (str, optional): Namespace sid - only on the server side.
         """
+
+        assert isinstance(data, bytes)
 
         try:
             new_data: Dict = ujson.loads(decompress(data))

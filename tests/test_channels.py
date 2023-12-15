@@ -13,6 +13,7 @@ from flask import Flask
 
 from era_5g_interface.channels import DATA_NAMESPACE, CallbackInfoClient, CallbackInfoServer, ChannelType
 from era_5g_interface.client_channels import ClientChannels
+from era_5g_interface.exceptions import BackPressureException
 from era_5g_interface.server_channels import ServerChannels
 
 
@@ -77,10 +78,17 @@ def test_channels() -> None:
             "test_exception": CallbackInfoClient(ChannelType.JSON, client_json_exc_callback),
         },
         disconnect_callback=None,
+        back_pressure_size=2,
     )
     client_ch.send_data(test_data, "test")
     assert server_got_data.wait(1)
     server_got_data.clear()
+
+    with pytest.raises(BackPressureException):  # noqa:PT012
+        for _ in range(100):
+            client_ch.send_data(test_data, "test", can_be_dropped=True)
+    while server_got_data.wait(1):
+        server_got_data.clear()
 
     client_ch.send_data(test_data, "test_lz4", channel_type=ChannelType.JSON_LZ4)
     assert server_got_data.wait(1)
@@ -90,6 +98,7 @@ def test_channels() -> None:
     client_ch.send_data(test_data, "test_exception", channel_type=ChannelType.JSON)
     assert not server_got_data.wait(1)
     assert os._exit.called
+    server_got_data.clear()
 
     os._exit.reset_mock()
 

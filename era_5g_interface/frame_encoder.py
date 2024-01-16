@@ -9,35 +9,46 @@ from av.video.codeccontext import VideoCodecContext
 from av.video.frame import VideoFrame
 
 
-class H264EncoderError(Exception):
-    """FFmpegError Exception."""
+class FrameEncoderError(Exception):
+    """FrameEncoderError Exception."""
 
     pass
 
 
 # TODO: only for testing purpose
+# from pathlib import Path
 # Path("input").mkdir(parents=True, exist_ok=True)
 
-logger = logging.getLogger("H.264 encoder")
+logger = logging.getLogger("Video frame encoder")
 
 
-class H264Encoder:
-    """H.264 Encoder."""
+class FrameEncoder:
+    """Video frame Encoder."""
 
-    def __init__(self, width: int, height: int, fps: float = 30, options: Optional[Dict[str, str]] = None) -> None:
+    def __init__(
+        self, width: int, height: int, fps: float = 30, codec: str = "h264", options: Optional[Dict[str, str]] = None
+    ) -> None:
         """Constructor.
 
         Args:
             width (int): Video frame width.
             height (int): Video frame height.
             fps (float): Video framerate (FPS), default: 30.
-            options (Dict[str, str], optional): H264 options, e.g. {"crf": "0", "preset": "ultrafast",
+            codec (str): Video codec name, e.g. h264, hevc, or vp9, default: h264.
+            options (Dict[str, str], optional): Codec options, e.g. {"crf": "0", "preset": "ultrafast",
                 "tune": "zerolatency", "x264-params": "keyint=5"}, default: {"preset": "ultrafast",
                 "tune": "zerolatency"}.
         """
 
+        # Some default options.
         if options is None:
-            options = {"preset": "ultrafast", "tune": "zerolatency"}
+            if codec == "h264":
+                options = {"preset": "ultrafast", "tune": "zerolatency"}
+            elif codec == "hevc":
+                options = {"crf": "10", "preset": "ultrafast", "tune": "zerolatency", "x265-params": "frame-threads=1"}
+            elif codec == "vp9":
+                options = {"quality": "realtime", "speed": "8", "lag-in-frames": "0"}
+        logger.debug(f"Encoder ({codec}) options: {options}")
 
         # TODO: only for testing purpose
         # options = {"crf": "0", "preset": "ultrafast", "tune": "zerolatency"}
@@ -49,7 +60,7 @@ class H264Encoder:
         self._height = height
         self._options = options
         self._pix_fmt = "yuv420p"
-        self._encoder: VideoCodecContext = CodecContext.create("h264", "w")
+        self._encoder: VideoCodecContext = CodecContext.create(codec, "w")
         self._init_count = 0
         self.last_timestamp: int = 0
         self._last_frame_is_keyframe = False
@@ -83,15 +94,17 @@ class H264Encoder:
         return self._fps
 
     def encoder_init(self) -> None:
-        """Init H.264 encoder."""
+        """Init video encoder."""
 
         self._init_count += 1
-        self._encoder = CodecContext.create("h264", "w")
+        if self._encoder.is_open:
+            self._encoder.close()
         self._encoder.width = self._width
         self._encoder.height = self._height
         self._encoder.framerate = self._fps
         self._encoder.pix_fmt = self._pix_fmt
         self._encoder.options = self._options
+        self._encoder.open()
 
     def get_init_count(self) -> int:
         """Get encoder init attempts count.
@@ -112,7 +125,7 @@ class H264Encoder:
         return self._last_frame_is_keyframe
 
     def encode_ndarray(self, frame_data: np.ndarray, format: str = "bgr24") -> bytes:
-        """Encode ndarray to H.264 packets bytes.
+        """Encode ndarray to packets bytes.
 
         Args:
             frame_data (ndarray): Video frame / image.
@@ -125,7 +138,7 @@ class H264Encoder:
         try:
             frame = VideoFrame.from_ndarray(frame_data, format=format)
             # TODO: only for testing purpose
-            # frame.to_image().save('input/frame-%04d.jpg' % self.frame_id)
+            # frame.to_image().save("input/frame-%04d.jpg" % self.frame_id)
             # self.frame_id += 1
 
             self._last_frame_is_keyframe = False
@@ -133,19 +146,23 @@ class H264Encoder:
             packet: Packet
             for packet in self._encoder.encode(frame):
                 # TODO: only for testing purpose
-                # logger.debug(f"Frame {frame} encoded to packet: {packet}")
-                # logger.debug(
-                #    f"packet.pts: {packet.pts}, "
-                #    f"packet.dts: {packet.dts}, "
-                #    f"packet.key_frame: {packet.is_keyframe}, "
-                #    f"packet.is_corrupt: {packet.is_corrupt}"
-                # )
+                logger.debug(f"Frame {frame} encoded to packet: {packet}")
+                logger.debug(
+                    f"packet.pts: {packet.pts}, "
+                    f"packet.dts: {packet.dts}, "
+                    f"packet.key_frame: {packet.is_keyframe}, "
+                    f"packet.is_corrupt: {packet.is_corrupt}"
+                )
                 if packet.is_keyframe:
                     self._last_frame_is_keyframe = True
                 packets.append(bytes(packet))
+
+            # TODO: only for testing purpose
+            # if len(packets) == 0:
+            #    raise FFmpegError(tag_to_code(b"INDA"), f"No packet encoded from frame {frame}")
 
             if len(packets) > 1:
                 logger.info(f"Frame {frame} encoded to multiple packets: {packets}")
             return b"".join(packets)
         except FFmpegError as e:
-            raise H264EncoderError(e)
+            raise FrameEncoderError(e)

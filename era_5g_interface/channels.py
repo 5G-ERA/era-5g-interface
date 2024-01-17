@@ -14,8 +14,8 @@ import ujson
 from lz4.frame import compress, decompress
 
 from era_5g_interface.exceptions import BackPressureException, UnknownChannelTypeUsed
-from era_5g_interface.h264_decoder import H264Decoder, H264DecoderError
-from era_5g_interface.h264_encoder import H264Encoder, H264EncoderError
+from era_5g_interface.frame_decoder import FrameDecoder, FrameDecoderError
+from era_5g_interface.frame_encoder import FrameEncoder, FrameEncoderError
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ class ChannelType(Enum):
     JPEG = 2
     H264 = 3
     JSON_LZ4 = 4
+    HEVC = 5
 
 
 @dataclass
@@ -44,7 +45,7 @@ class CallbackInfoClient:
     """Callback info dataclass used on client side."""
 
     type: ChannelType
-    callback: Callable[[Dict], None]  # Custom callback with dict.
+    callback: Callable[[Dict], Any]  # Custom callback with dict.
     error_event: str = DATA_ERROR_EVENT  # Custom error event name.
 
 
@@ -53,15 +54,15 @@ class CallbackInfoServer:
     """Callback info dataclass used on server side - callback has namespace sid parameter."""
 
     type: ChannelType
-    callback: Callable[[str, Dict], None]  # Custom callback with sid and dict.
+    callback: Callable[[str, Dict], Any]  # Custom callback with sid and dict.
     error_event: str = DATA_ERROR_EVENT  # Custom error event name.
 
 
 class Channels(ABC):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264 encoding/decoding. Data is sent via the DATA_NAMESPACE. The class cannot be
-    used alone. The ServerChannels and ClientChannels classes create callbacks and encoders/decoders.
+    It handles image frames JPEG, H.264 and HEVC encoding/decoding. Data is sent via the DATA_NAMESPACE. The class
+    cannot be used alone. The ServerChannels and ClientChannels classes create callbacks and encoders/decoders.
     """
 
     # This should work roughly like an abstract member.
@@ -72,7 +73,7 @@ class Channels(ABC):
         sio: Union[socketio.Client, socketio.Server],
         callbacks_info: Union[Dict[str, CallbackInfoClient], Dict[str, CallbackInfoServer]],
         back_pressure_size: Optional[int] = 5,
-        recreate_h264_attempts_count: int = 5,
+        recreate_coder_attempts_count: int = 5,
         stats: bool = False,
     ):
         """Constructor.
@@ -82,7 +83,7 @@ class Channels(ABC):
             callbacks_info (Union[Dict[str, CallbackInfoClient], Dict[str, CallbackInfoServer]]): Callbacks Info
                 dictionary, key is custom event name.
             back_pressure_size (int, optional): Back pressure size - max size of eio.queue.qsize().
-            recreate_h264_attempts_count (int): How many times try to recreate the H.264 encoder/decoder.
+            recreate_coder_attempts_count (int): How many times try to recreate the frame encoder/decoder.
             stats (bool): Store output data sizes.
         """
 
@@ -92,15 +93,15 @@ class Channels(ABC):
             raise ValueError("Invalid value for back_pressure_size.")
 
         self._back_pressure_size = back_pressure_size
-        self._recreate_h264_attempts_count = recreate_h264_attempts_count
+        self._recreate_coder_attempts_count = recreate_coder_attempts_count
         self._stats = stats
         if self._stats:
             self._sizes: List[int] = []
 
         self._callbacks_info = callbacks_info
-        # For multiple H.264 streams, the encoders and the decoders are indexed by Tuple(eio_sid, event).
-        self._decoders: Dict[Tuple[str, str], H264Decoder] = dict()
-        self._encoders: Dict[Tuple[str, str], H264Encoder] = dict()
+        # For multiple frame streams, the encoders and the decoders are indexed by Tuple(eio_sid, event).
+        self._decoders: Dict[Tuple[str, str], FrameDecoder] = dict()
+        self._encoders: Dict[Tuple[str, str], FrameEncoder] = dict()
 
     @staticmethod
     def _shutdown(cb_type: str, event: str) -> None:
@@ -132,22 +133,24 @@ class Channels(ABC):
         sid: Optional[str] = None,
         can_be_dropped: bool = True,
         wait_for_reconnection: bool = True,
+        blocking: bool = False,
         encoding_options: Optional[Dict[str, str]] = None,
-    ) -> None:
-        """Send general image data with JPEG or H.264 encoding via DATA_NAMESPACE.
+    ) -> Any:
+        """Send general image data with JPEG or H.264 or HEVC encoding via DATA_NAMESPACE.
 
         NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
 
         Args:
             frame (np.ndarray): Video frame / image.
             event (str): Event name.
-            channel_type (ChannelType): Encoding type - ChannelType.JPEG or ChannelType.H264.
+            channel_type (ChannelType): Encoding type - ChannelType.JPEG or ChannelType.H264 or ChannelType.HEVC.
             timestamp (int): Frame timestamp.
             metadata (Dict[str, Any], optional): Optional metadata to send.
             sid (str, optional): Namespace sid - mandatory when sending from the server side to the client.
             can_be_dropped (bool): If data can be lost due to back pressure.
             wait_for_reconnection (bool): Wait for reconnection to server side? Wait is blocking.
-            encoding_options (Dict[str, str], optional): ChannelType.H264 options, e.g. {"crf": "0", "preset":
+            blocking (bool): If True, wait for the response. Defaults to False.
+            encoding_options (Dict[str, str], optional): Video codec options, e.g. {"crf": "0", "preset":
                 "ultrafast", "tune": "zerolatency", "x264-params": "keyint=5"}, default: {"preset": "ultrafast",
                 "tune": "zerolatency"}.
 
@@ -155,7 +158,7 @@ class Channels(ABC):
         Parameters encoding_options and frame.shape are only used in the first send_image call to create the encoder.
         """
 
-        if channel_type is not ChannelType.JPEG and channel_type is not ChannelType.H264:
+        if channel_type not in (ChannelType.JPEG, ChannelType.H264, ChannelType.HEVC):
             raise UnknownChannelTypeUsed()
 
         if timestamp is None:
@@ -165,20 +168,27 @@ class Channels(ABC):
             data["metadata"] = metadata
         eio_sid = self.get_client_eio_sid(sid, DATA_NAMESPACE)
         encoder_id = (eio_sid, event)
-        if channel_type is ChannelType.H264:
+        if channel_type in (ChannelType.H264, ChannelType.HEVC):
             if encoder_id not in self._encoders:
                 try:
-                    logger.info(f"Creating H.264 encoder for image size {frame.shape[1]}x{frame.shape[0]}")
-                    self._encoders[encoder_id] = H264Encoder(frame.shape[1], frame.shape[0], options=encoding_options)
+                    if channel_type is ChannelType.H264:
+                        logger.info(f"Creating H.264 encoder for image size {frame.shape[1]}x{frame.shape[0]}")
+                        self._encoders[encoder_id] = FrameEncoder(
+                            frame.shape[1], frame.shape[0], codec="h264", options=encoding_options
+                        )
+                    elif channel_type is ChannelType.HEVC:
+                        logger.info(f"Creating HEVC encoder for image size {frame.shape[1]}x{frame.shape[0]}")
+                        self._encoders[encoder_id] = FrameEncoder(
+                            frame.shape[1], frame.shape[0], codec="hevc", options=encoding_options
+                        )
                 except Exception as e:
-                    logger.error(f"Cannot create H.264 encoder: {repr(e)}")
+                    logger.error(f"Cannot create video frame encoder: {repr(e)}")
                     raise e
         try:
             is_key_frame = False
-            if channel_type is ChannelType.H264:
+            if channel_type in (ChannelType.H264, ChannelType.HEVC):
                 frame_encoded = self._encoders[encoder_id].encode_ndarray(frame)
                 # TODO: dataclass for this data
-                data["h264"] = True
                 data["width"] = self._encoders[encoder_id].width()
                 data["height"] = self._encoders[encoder_id].height()
                 is_key_frame = self._encoders[encoder_id].last_frame_is_keyframe()
@@ -190,16 +200,24 @@ class Channels(ABC):
                 # TODO: include all data size
                 self._sizes.append(len(frame_encoded))
                 logger.debug(f"Frame data size: {self._sizes[-1]}")
-            self.send_data(
-                data,
-                event,
-                sid=sid,
-                can_be_dropped=(can_be_dropped and not is_key_frame),
-            )
-        except H264EncoderError as e:
-            logger.error(f"H.264 encoder error: {e}")
+            if len(frame_encoded):
+                self.send_data(
+                    data,
+                    event,
+                    sid=sid,
+                    can_be_dropped=(can_be_dropped and not is_key_frame),
+                    wait_for_reconnection=wait_for_reconnection,
+                )
+            else:
+                logger.warning(
+                    "Encoded frame size is zero. It is possible that the encoder settings allow a delay "
+                    "of several frames at the beginning of the stream. This means that the timestamps "
+                    "will be shifted and will not match the original frames."
+                )
+        except FrameEncoderError as e:
+            logger.error(f"Video frame encoder error: {e}")
             # Try to recreate encoder
-            if self._encoders[encoder_id].get_init_count() < self._recreate_h264_attempts_count:
+            if self._encoders[encoder_id].get_init_count() < self._recreate_coder_attempts_count:
                 logger.info(f"Try to recreate encoder ... attempt {self._encoders[encoder_id].get_init_count()}")
                 self._encoders[encoder_id].encoder_init()
             else:
@@ -213,7 +231,8 @@ class Channels(ABC):
         sid: Optional[str] = None,
         can_be_dropped: bool = False,
         wait_for_reconnection: bool = True,
-    ) -> None:
+        blocking: bool = False,
+    ) -> Any:
         """Send general JSON data via DATA_NAMESPACE.
 
         NOTE: DATA_NAMESPACE is assumed to be a connected namespace.
@@ -225,6 +244,7 @@ class Channels(ABC):
             sid (str, optional): Namespace sid - mandatory when sending from the server side to the client.
             can_be_dropped (bool): If data can be lost due to back pressure.
             wait_for_reconnection (bool): Wait for reconnection to server side? Wait is blocking.
+            blocking (bool): If True, wait for the response. Defaults to False.
         """
 
         if channel_type is not ChannelType.JSON and channel_type is not ChannelType.JSON_LZ4:
@@ -244,13 +264,19 @@ class Channels(ABC):
                     if not self._sio._reconnect_task or not self._sio._reconnect_task.is_alive():
                         break
                     time.sleep(1)
-            self._sio.emit(event, new_data, namespace=DATA_NAMESPACE)
+            if blocking:
+                return self._sio.call(event, new_data, namespace=DATA_NAMESPACE)
+            else:
+                self._sio.emit(event, new_data, namespace=DATA_NAMESPACE)
         else:
             if sid is None:
                 raise ValueError("'sid' has to be set for server.")
             if not self._sio.manager.is_connected(sid, DATA_NAMESPACE):
                 raise ConnectionError(f"Client with {DATA_NAMESPACE} sid {sid} is not connected to server.")
-            self._sio.emit(event, new_data, namespace=DATA_NAMESPACE, to=sid)
+            if blocking:
+                self._sio.call(event, new_data, namespace=DATA_NAMESPACE, to=sid)
+            else:
+                self._sio.emit(event, new_data, namespace=DATA_NAMESPACE, to=sid)
 
     def get_client_eio_sid(self, sid: Optional[str] = None, namespace: Optional[str] = None) -> str:
         """Get client eio sid.
@@ -281,7 +307,7 @@ class Channels(ABC):
         logger.error(f"Data error, eio_sid {self.get_client_eio_sid(sid, DATA_NAMESPACE)}, sid {sid}, data {data}")
 
     def image_decode(self, data: Dict[str, Any], event: str, sid: Optional[str] = None) -> Optional[Dict]:
-        """Decode JPEG or H.264 encoded image received on DATA_NAMESPACE.
+        """Decode JPEG or H.264 or HEVC encoded image received on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): Received dictionary with frame data.
@@ -306,25 +332,32 @@ class Channels(ABC):
 
         eio_sid = self.get_client_eio_sid(sid, DATA_NAMESPACE)
         decoder_id = (eio_sid, event)
-        if self._callbacks_info[event].type is ChannelType.H264 and decoder_id not in self._decoders:
+        if (
+            self._callbacks_info[event].type in (ChannelType.H264, ChannelType.HEVC)
+            and decoder_id not in self._decoders
+        ):
             if "width" not in data or "height" not in data:
-                logger.error("Data does not contain width or height, it is mandatory for H.264.")
+                logger.error("Data does not contain width or height, it is mandatory for video frame decoder.")
                 self.send_data(
                     {
                         "timestamp": timestamp,
-                        "error": "Data does not contain width or height, it is mandatory for H.264.",
+                        "error": "Data does not contain width or height, it is mandatory for video frame decoder.",
                     },
                     self._callbacks_info[event].error_event,
                     sid=sid,
                 )
                 return None
             try:
-                logger.info(f"Creating H.264 decoder for image size {data['width']}x{data['height']}")
-                self._decoders[decoder_id] = H264Decoder(data["width"], data["height"])
+                if self._callbacks_info[event].type is ChannelType.H264:
+                    logger.info(f"Creating H.264 decoder for image size {data['width']}x{data['height']}")
+                    self._decoders[decoder_id] = FrameDecoder(data["width"], data["height"], codec="h264")
+                elif self._callbacks_info[event].type is ChannelType.HEVC:
+                    logger.info(f"Creating HEVC decoder for image size {data['width']}x{data['height']}")
+                    self._decoders[decoder_id] = FrameDecoder(data["width"], data["height"], codec="hevc")
             except Exception as e:
-                logger.error(f"Cannot create H.264 decoder: {repr(e)}")
+                logger.error(f"Cannot create video frame decoder: {repr(e)}")
                 self.send_data(
-                    {"timestamp": timestamp, "error": f"Cannot create H.264 decoder: {repr(e)}"},
+                    {"timestamp": timestamp, "error": f"Cannot create video frame decoder: {repr(e)}"},
                     self._callbacks_info[event].error_event,
                     sid=sid,
                 )
@@ -340,8 +373,10 @@ class Channels(ABC):
                 self.send_data(
                     {
                         "timestamp": timestamp,
-                        "error": f"Received frame with older timestamp: {timestamp}, "
-                        f"last_timestamp: {last_timestamp}, diff: {timestamp - last_timestamp}",
+                        "error": (
+                            f"Received frame with older timestamp: {timestamp}, "
+                            f"last_timestamp: {last_timestamp}, diff: {timestamp - last_timestamp}"
+                        ),
                     },
                     self._callbacks_info[event].error_event,
                     sid=sid,
@@ -352,14 +387,14 @@ class Channels(ABC):
         if decoder_id in self._decoders:
             try:
                 frame_decoded = self._decoders[decoder_id].decode_packet_data(data["frame"])
-            except H264DecoderError as e:
-                logger.error(f"H.264 decoder error: {e}")
+            except FrameDecoderError as e:
+                logger.error(f"Video frame decoder error: {e}")
                 # Try to recreate decoder
-                if self._decoders[decoder_id].get_init_count() < self._recreate_h264_attempts_count:
+                if self._decoders[decoder_id].get_init_count() < self._recreate_coder_attempts_count:
                     logger.info(f"Try to recreate decoder ... attempt {self._decoders[decoder_id].get_init_count()}")
-                    self._decoders[decoder_id].decoder_init()
+                    # self._decoders[decoder_id].decoder_init()
                 self.send_data(
-                    {"timestamp": timestamp, "error": f"H.264 decoder error: {e}"},
+                    {"timestamp": timestamp, "error": f"Video frame decoder error: {e}"},
                     self._callbacks_info[event].error_event,
                     sid=sid,
                 )

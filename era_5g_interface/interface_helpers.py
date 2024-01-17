@@ -10,11 +10,23 @@ from requests.adapters import HTTPAdapter, Retry
 
 logger = logging.getLogger(__name__)
 
-NETAPP_ID = str(os.getenv("NETAPP_ID", "00000000-0000-0000-0000-000000000000"))
+# Middleware Network Application ID (task ID, NETAPP_ID).
+MIDDLEWARE_TASK_ID = str(
+    os.getenv("MIDDLEWARE_TASK_ID", os.getenv("NETAPP_ID", "00000000-0000-0000-0000-000000000000"))
+)
+# NETAPP_ID used for compatibility.
+NETAPP_ID = MIDDLEWARE_TASK_ID
 NETAPP_ID_ROS = NETAPP_ID.replace("-", "_")
+# Middleware robot ID (robot ID).
+MIDDLEWARE_ROBOT_ID = str(os.getenv("MIDDLEWARE_ROBOT_ID", "00000000-0000-0000-0000-000000000000"))
+# Middleware address.
 MIDDLEWARE_ADDRESS = str(os.getenv("MIDDLEWARE_ADDRESS", "http://localhost"))
 MIDDLEWARE_REPORT_INTERVAL = float(os.getenv("MIDDLEWARE_REPORT_INTERVAL", 1))
+# Used for Network Application heart beat.
 MAX_LATENCY = float(os.getenv("NETAPP_MAX_LATENCY", 100))
+
+# Event name used for communication between clients and heartbeat module.
+HEARTBEAT_CLIENT_EVENT = "heartbeat_client_event"
 
 
 class LatencyMeasurements:
@@ -100,37 +112,87 @@ class HeartBeatSender:
         self.session.mount(MIDDLEWARE_ADDRESS, self.adapter)
         self.connection_error = False
 
-    def _send_middleware_heart_beat_request(self, headers: Dict, json: Dict) -> None:
+    def _send_heart_beat_request(self, headers: Dict, json: Dict, repeat_on_error: bool = False) -> None:
         """Send heart beat request to Middleware.
 
         Args:
             headers (Dict): Request headers.
             json (Dict): Request JSON.
+            repeat_on_error (bool): If set, repeat requests further. Defaults to False.
         """
 
-        if not self.connection_error:
+        if not self.connection_error or repeat_on_error:
             logger.debug(f"Sending heart beat to middleware: {json}")
             try:
                 response = self.session.post(MIDDLEWARE_ADDRESS, headers=headers, json=json, timeout=(0.2, 0.2))
                 if response.ok:
                     logger.debug(f"Middleware heart beat response: {response.text}")
                 else:
-                    logger.warning(f"Middleware heart beat response: {response}")
+                    logger.warning(
+                        f"Middleware heart beat response: {response}, middleware address: {MIDDLEWARE_ADDRESS}"
+                    )
                     self.connection_error = True
             except requests.RequestException as ex:
                 logger.warning(f"Failed to connect to the middleware address: {MIDDLEWARE_ADDRESS}, {repr(ex)}")
                 self.connection_error = True
 
+    def send_robot_heart_beat(
+        self,
+        battery_level: float,
+        cpu_utilization: List[float],
+        ram_utilization: float,
+        quality_map_status=None,
+        repeat_on_error: bool = False,
+    ) -> None:
+        """Send robot heart beat to Middleware.
+
+        Args:
+            battery_level (float): Robot battery level.
+            cpu_utilization (float): Robot CPU utilization.
+            ram_utilization (float):  Robot RAM utilization.
+            quality_map_status (None): Unused, will be updated.
+            repeat_on_error (bool): If set, repeat requests further. Defaults to False.
+        """
+
+        data = {
+            "RobotId": MIDDLEWARE_ROBOT_ID,
+            "BatteryLevel": battery_level,
+            "CPUUtilization": cpu_utilization,
+            "RAMUtilization": ram_utilization,
+            "QualityMapStatus": quality_map_status,
+        }
+        headers = {"Content-type": "application/json"}
+        self._send_heart_beat_request(headers=headers, json=data, repeat_on_error=repeat_on_error)
+
     def send_middleware_heart_beat(
         self, avg_latency: float, queue_size: int, queue_occupancy: float, current_robot_count: int
     ) -> None:
-        """Send heart beat to Middleware.
+        """Obsolete function, use send_application_heart_beat instead.
 
         Args:
             avg_latency (float): Average latency.
             queue_size (int): Queue size.
             queue_occupancy (float): Queue occupancy.
             current_robot_count (int): Current robot count.
+        """
+        self.send_application_heart_beat(avg_latency, queue_size, queue_occupancy, current_robot_count)
+
+    def send_application_heart_beat(
+        self,
+        avg_latency: float,
+        queue_size: int,
+        queue_occupancy: float,
+        current_robot_count: int,
+        repeat_on_error: bool = False,
+    ) -> None:
+        """Send application heart beat to Middleware.
+
+        Args:
+            avg_latency (float): Average latency.
+            queue_size (int): Queue size.
+            queue_occupancy (float): Queue occupancy.
+            current_robot_count (int): Current robot count.
+            repeat_on_error (bool): If set, repeat requests further. Defaults to False.
         """
 
         # Latency can change over time, so reporting just the simple que occupancy can be misleading.
@@ -153,10 +215,10 @@ class HeartBeatSender:
             optimal_robot_count_limit = math.floor(hard_robot_count_limit * 0.8)
 
         data = {
-            "Id": NETAPP_ID,
+            "Id": MIDDLEWARE_TASK_ID,
             "CurrentRobotsCount": current_robot_count,
             "OptimalLimit": optimal_robot_count_limit,
             "HardLimit": hard_robot_count_limit,
         }
         headers = {"Content-type": "application/json"}
-        self._send_middleware_heart_beat_request(headers=headers, json=data)
+        self._send_heart_beat_request(headers=headers, json=data, repeat_on_error=repeat_on_error)

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class ClientChannels(Channels):
     """Channels class is used to define channel data callbacks and contains send functions.
 
-    It handles image frames JPEG and H.264, and JSON LZ4 encoding/decoding. Data is sent via the DATA_NAMESPACE.
+    It handles image frames JPEG, H.264 and HEVC, and JSON LZ4 encoding/decoding. Data is sent via the DATA_NAMESPACE.
     """
 
     _callbacks_info: Dict[str, CallbackInfoClient]
@@ -30,7 +30,7 @@ class ClientChannels(Channels):
             callbacks_info (Dict[str, CallbackInfoClient]): Callbacks Info dictionary, key is custom event name.
             disconnect_callback (Callable, optional): Triggered on client side before _shutdown on unhandled exception.
             back_pressure_size (int, optional): Back pressure size - max size of eio.queue.qsize().
-            recreate_h264_attempts_count (int): How many times try to recreate the H.264 encoder/decoder.
+            recreate_coder_attempts_count (int): How many times try to recreate the video frame encoder/decoder.
             stats (bool): Store output data sizes.
         """
 
@@ -54,7 +54,7 @@ class ClientChannels(Channels):
                     lambda data, local_event=event: self.json_lz4_callback(data, local_event),
                     namespace=DATA_NAMESPACE,
                 )
-            elif callback_info.type in (ChannelType.JPEG, ChannelType.H264):
+            elif callback_info.type in (ChannelType.JPEG, ChannelType.H264, ChannelType.HEVC):
                 self._sio.on(
                     event,
                     lambda data, local_event=event: self.image_callback(data, local_event),
@@ -63,7 +63,7 @@ class ClientChannels(Channels):
             else:
                 raise ValueError(f"Unknown channel type: {callback_info.type}")
 
-    def json_callback(self, data: Dict[str, Any], event: str) -> None:
+    def json_callback(self, data: Dict[str, Any], event: str) -> Any:
         """Allows to receive general JSON data on DATA_NAMESPACE.
 
         Args:
@@ -74,13 +74,13 @@ class ClientChannels(Channels):
         cb_info = self._callbacks_info[event]
 
         try:
-            cb_info.callback(data)
+            return cb_info.callback(data)
         except Exception:
             if self._disconnect_callback:
                 self._disconnect_callback()
             Channels._shutdown("JSON", event)
 
-    def json_lz4_callback(self, data: bytes, event: str) -> None:
+    def json_lz4_callback(self, data: bytes, event: str) -> Any:
         """Allows to receive LZ4 compressed general JSON data on DATA_NAMESPACE.
 
         Args:
@@ -90,10 +90,10 @@ class ClientChannels(Channels):
 
         decoded_data = super().data_lz4_decode(data, event)
         if decoded_data:
-            self.json_callback(decoded_data, event)
+            return self.json_callback(decoded_data, event)
 
-    def image_callback(self, data: Dict[str, Any], event: str) -> None:
-        """Allows to receive JPEG or H.264 encoded image on DATA_NAMESPACE.
+    def image_callback(self, data: Dict[str, Any], event: str) -> Any:
+        """Allows to receive JPEG or H.264 or HEVC encoded image on DATA_NAMESPACE.
 
         Args:
             data (Dict[str, Any]): Received dictionary with frame data.
@@ -105,7 +105,7 @@ class ClientChannels(Channels):
         decoded_data = super().image_decode(data, event)
         if decoded_data:
             try:
-                cb_info.callback(decoded_data)
+                return cb_info.callback(decoded_data)
             except Exception:
                 if self._disconnect_callback:
                     self._disconnect_callback()

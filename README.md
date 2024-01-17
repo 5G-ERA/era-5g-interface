@@ -24,18 +24,18 @@ pip install era_5g_interface
 ### Channels ([channels.py](era_5g_interface/channels.py))
 
 Channels class is used to define bidirectional channel data callbacks and contains send functions. It handles image 
-frames JPEG and H.264 encoding/decoding. The class cannot be used alone. The ServerChannels and ClientChannels 
+frames JPEG, H.264 and HEVC frame encoding/decoding. The class cannot be used alone. The ServerChannels and ClientChannels 
 classes create callbacks and encoders/decoders.
 
 ### ClientChannels and ServerChannels ([client_channels.py](era_5g_interface/client_channels.py), [server_channels.py](era_5g_interface/server_channels.py))
 
-ClientChannels and ServerChannels classes are used to define bidirectional channel (image ans JSON) callbacks and contains 
+ClientChannels and ServerChannels classes are used to define bidirectional channel (image and JSON) callbacks and contains 
 send functions. They are used inside the NetAppClientBase in era_5g_client and NetworkApplicationServer in 
 era_5g_server. ServerChannels is used with Socketio Server object, ClientChannels is used with Socketio Client object.
 
-### H264Decoder and H264Encoder ([h264_decoder.py](era_5g_interface/h264_decoder.py), [h264_encoder.py](era_5g_interface/h264_encoder.py))
+### FrameDecoder and FrameEncoder ([frame_decoder.py](era_5g_interface/frame_decoder.py), [frame_encoder.py](era_5g_interface/frame_encoder.py))
 
-H264Decoder and H264Encoder classes providing H.264 encoding and decoding.
+FrameDecoder and FrameEncoder classes providing video frame encoding and decoding.
 
 ### TaskHandlerInternalQ ([task_handler_internal_q.py](era_5g_interface/task_handler_internal_q.py))
 

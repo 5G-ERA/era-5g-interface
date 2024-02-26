@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -16,6 +17,7 @@ from lz4.frame import compress, decompress
 from era_5g_interface.exceptions import BackPressureException, UnknownChannelTypeUsed
 from era_5g_interface.frame_decoder import FrameDecoder, FrameDecoderError
 from era_5g_interface.frame_encoder import FrameEncoder, FrameEncoderError
+from era_5g_interface.measuring import Measuring
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +74,11 @@ class Channels(ABC):
         self,
         sio: Union[socketio.Client, socketio.Server],
         callbacks_info: Union[Dict[str, CallbackInfoClient], Dict[str, CallbackInfoServer]],
+        disconnect_callback: Optional[Callable] = None,
         back_pressure_size: Optional[int] = 5,
         recreate_coder_attempts_count: int = 5,
         stats: bool = False,
+        extended_measuring: bool = False,
     ):
         """Constructor.
 
@@ -82,12 +86,15 @@ class Channels(ABC):
             sio (Union[socketio.Client, socketio.Server]): Socketio Client or Server object.
             callbacks_info (Union[Dict[str, CallbackInfoClient], Dict[str, CallbackInfoServer]]): Callbacks Info
                 dictionary, key is custom event name.
+            disconnect_callback (Callable, optional): Triggered before _shutdown on unhandled exception.
             back_pressure_size (int, optional): Back pressure size - max size of eio.queue.qsize().
             recreate_coder_attempts_count (int): How many times try to recreate the frame encoder/decoder.
             stats (bool): Store output data sizes.
+            extended_measuring (bool): Enable logging of measuring.
         """
 
         self._sio = sio
+        self._disconnect_callback = disconnect_callback
 
         if back_pressure_size is not None and back_pressure_size < 1:
             raise ValueError("Invalid value for back_pressure_size.")
@@ -97,15 +104,62 @@ class Channels(ABC):
         self._stats = stats
         if self._stats:
             self._sizes: List[int] = []
+        self._extended_measuring = extended_measuring
+
+        if isinstance(self._sio, socketio.Client):
+            measuring_filename_prefix = "client-"
+        else:
+            measuring_filename_prefix = "server-"
+
+        self._input_measuring = Measuring(
+            measuring_items={
+                "key_timestamp": 0,
+                "eio_sid": 0,
+                "event": "",
+                "before_decode_timestamp": 0,
+                "after_decode_timestamp": 0,
+                "before_lz4_decode_timestamp": 0,
+                "after_lz4_decode_timestamp": 0,
+                "before_callback_timestamp": 0,
+                "after_callback_timestamp": 0,
+            },
+            enabled=self._extended_measuring,
+            filename_prefix=measuring_filename_prefix + "channels-input",
+        )
+
+        self._output_measuring = Measuring(
+            measuring_items={
+                "key_timestamp": 0,
+                "eio_sid": 0,
+                "event": "",
+                "worker_recv_timestamp": 0,
+                "worker_before_process_timestamp": 0,
+                "worker_after_process_timestamp": 0,
+                "worker_send_timestamp": 0,
+                "before_encode_timestamp": 0,
+                "after_encode_timestamp": 0,
+                "size": 0,
+                "before_lz4_encode_timestamp": 0,
+                "after_lz4_encode_timestamp": 0,
+                "before_send_timestamp": 0,
+                "after_send_timestamp": 0,
+            },
+            enabled=self._extended_measuring,
+            filename_prefix=measuring_filename_prefix + "channels-output",
+        )
 
         self._callbacks_info = callbacks_info
         # For multiple frame streams, the encoders and the decoders are indexed by Tuple(eio_sid, event).
         self._decoders: Dict[Tuple[str, str], FrameDecoder] = dict()
         self._encoders: Dict[Tuple[str, str], FrameEncoder] = dict()
 
-    @staticmethod
-    def _shutdown(cb_type: str, event: str) -> None:
+    def _shutdown(self, cb_type: str, event: str, sid: Optional[str] = None) -> None:
         logger.error(f"Unhandled exception in {cb_type} callback (event: {event}).", exc_info=sys.exc_info())
+        if self._disconnect_callback:
+            if isinstance(self._sio, socketio.Client):
+                self._disconnect_callback()
+            else:
+                self._disconnect_callback(sid, DATA_NAMESPACE)
         logging.shutdown()  # should flush the logger
         os._exit(1)  # standard sys.exit() is not enough
 
@@ -122,6 +176,18 @@ class Channels(ABC):
                 eio_sid = self.get_client_eio_sid(str(sid), DATA_NAMESPACE)
                 if self._sio.eio.sockets[eio_sid].queue.qsize() > self._back_pressure_size:
                     raise BackPressureException()
+
+    @staticmethod
+    def get_timestamp_from_data(data: Dict, name: str = "timestamp", default: Optional[int] = None):
+        if default is None:
+            default = time.perf_counter_ns()
+        timestamp = data.get(name, 0)
+        if not timestamp:
+            try:
+                timestamp = json.loads(data.get("data", "")).get(name, default)
+            except ValueError:
+                timestamp = default
+        return timestamp
 
     def send_image(
         self,
@@ -186,6 +252,9 @@ class Channels(ABC):
                     raise e
         try:
             is_key_frame = False
+
+            self._output_measuring.log_timestamp(timestamp, "before_encode_timestamp")
+
             if channel_type in (ChannelType.H264, ChannelType.HEVC):
                 frame_encoded = self._encoders[encoder_id].encode_ndarray(frame)
                 # TODO: dataclass for this data
@@ -195,11 +264,18 @@ class Channels(ABC):
             else:
                 _, frame_jpeg = cv2.imencode(".jpg", frame)
                 frame_encoded = frame_jpeg.tobytes()
+
+            self._output_measuring.log_timestamp(timestamp, "after_encode_timestamp")
+
             data["frame"] = frame_encoded
+
             if self._stats:
                 # TODO: include all data size
                 self._sizes.append(len(frame_encoded))
                 logger.debug(f"Frame data size: {self._sizes[-1]}")
+
+                self._output_measuring.log_measuring(timestamp, "size", self._sizes[-1])
+
             if len(frame_encoded):
                 self.send_data(
                     data,
@@ -207,6 +283,7 @@ class Channels(ABC):
                     sid=sid,
                     can_be_dropped=(can_be_dropped and not is_key_frame),
                     wait_for_reconnection=wait_for_reconnection,
+                    blocking=blocking,
                 )
             else:
                 logger.warning(
@@ -250,12 +327,35 @@ class Channels(ABC):
         if channel_type is not ChannelType.JSON and channel_type is not ChannelType.JSON_LZ4:
             raise UnknownChannelTypeUsed()
 
+        timestamp = Channels.get_timestamp_from_data(data)
+
+        self._output_measuring.log_measuring(
+            timestamp, "worker_recv_timestamp", Channels.get_timestamp_from_data(data, "recv_timestamp", 0)
+        )
+        self._output_measuring.log_measuring(
+            timestamp,
+            "worker_before_process_timestamp",
+            Channels.get_timestamp_from_data(data, "timestamp_before_process", 0),
+        )
+        self._output_measuring.log_measuring(
+            timestamp,
+            "worker_after_process_timestamp",
+            Channels.get_timestamp_from_data(data, "timestamp_after_process", 0),
+        )
+        self._output_measuring.log_measuring(
+            timestamp, "worker_send_timestamp", Channels.get_timestamp_from_data(data, "send_timestamp", 0)
+        )
+
         if can_be_dropped:
             self._apply_back_pressure(sid)
 
         new_data = data
         if channel_type is ChannelType.JSON_LZ4:
+            self._output_measuring.log_timestamp(timestamp, "before_lz4_encode_timestamp")
             new_data = compress(bytes(ujson.dumps(data), "utf-8"))
+            self._output_measuring.log_timestamp(timestamp, "after_lz4_encode_timestamp")
+
+        self._output_measuring.log_timestamp(timestamp, "before_send_timestamp")
 
         if isinstance(self._sio, socketio.Client):
             if wait_for_reconnection:
@@ -277,6 +377,11 @@ class Channels(ABC):
                 self._sio.call(event, new_data, namespace=DATA_NAMESPACE, to=sid)
             else:
                 self._sio.emit(event, new_data, namespace=DATA_NAMESPACE, to=sid)
+
+        self._output_measuring.log_timestamp(timestamp, "after_send_timestamp")
+        self._output_measuring.log_measuring(timestamp, "eio_sid", self.get_client_eio_sid(sid, DATA_NAMESPACE))
+        self._output_measuring.log_measuring(timestamp, "event", event)
+        self._output_measuring.store_measuring(timestamp)
 
     def get_client_eio_sid(self, sid: Optional[str] = None, namespace: Optional[str] = None) -> str:
         """Get client eio sid.
@@ -315,11 +420,15 @@ class Channels(ABC):
             sid (str, optional): Namespace sid - only on the server side.
         """
 
-        if "timestamp" in data:
-            timestamp = data["timestamp"]
-        else:
-            logger.info("Timestamp not set, setting default value")
-            timestamp = 0
+        if "timestamp" not in data:
+            logger.error("Missing timestamp in frame data dictionary.")
+            self.send_data(
+                {"timestamp": 0, "error": "Missing timestamp in frame data dictionary."},
+                self._callbacks_info[event].error_event,
+                sid=sid,
+            )
+            return None
+        timestamp = data.get("timestamp", 0)
 
         if "frame" not in data:
             logger.error("Data does not contain frame.")

@@ -4,11 +4,13 @@ opencv-python>=4.7
 python-socketio[client]>=5.10.0
 lz4>=4.3.2
 ujson>=5.8.0
-pytest==7.4.3
+pytest>=8.0.2
+psutil>=5.9.8
 
 # this could go to mypy.txt but it does not work for some reason
 types-requests>=2.31.0.10
 types-ujson>=5.8.0.1
+types-psutil>=5.9.5
 
 # this is only used by pytest and mypy
-flask>=3.0.0
+flask>=3.0.2

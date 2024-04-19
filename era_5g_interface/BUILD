@@ -9,7 +9,7 @@ python_distribution(
     sdist=True,
     provides=setup_py(
         name="era_5g_interface",
-        version="0.10.0",
+        version="0.10.1",
         description="An interface for 5G-ERA Network Applications",
         author="Michal Kapinus",
         author_email="ikapinus@fit.vutbr.cz",

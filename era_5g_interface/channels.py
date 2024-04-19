@@ -185,7 +185,7 @@ class Channels(ABC):
         if not timestamp:
             try:
                 timestamp = json.loads(data.get("data", "")).get(name, default)
-            except ValueError:
+            except (ValueError, TypeError):
                 timestamp = default
         return timestamp
 

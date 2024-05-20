@@ -118,11 +118,10 @@ class FrameDecoder:
             frame: VideoFrame
             for frame in self._decoder.decode(packet):
                 # TODO: only for testing purpose
-                logger.debug(f"Frame {frame} with id {frame.index} decoded from packet: {packet}")
+                logger.debug(f"Frame {frame} decoded from packet: {packet}")
                 logger.debug(
                     f"frame.pts: {frame.pts}, "
                     f"frame.dts: {frame.dts}, "
-                    f"frame.index: {frame.index}, "
                     f"frame.key_frame: {frame.key_frame}, "
                     f"frame.is_corrupt: {frame.is_corrupt}, "
                     f"frame.time: {frame.time}"

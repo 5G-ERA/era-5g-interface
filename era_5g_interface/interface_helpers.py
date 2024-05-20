@@ -171,6 +171,7 @@ if __name__ == "__main__":
     heartbeat_sender = HeartbeatSender(MIDDLEWARE_ADDRESS + "/status/netapp", generate_application_heartbeat_data)
     heartbeat_sender._send_heartbeat_request()
     del heartbeat_sender
+    print("")
     heartbeat_sender = HeartbeatSender(MIDDLEWARE_ADDRESS + "/status/robot", generate_robot_heartbeat_data)
     heartbeat_sender._send_heartbeat_request()
     del heartbeat_sender
